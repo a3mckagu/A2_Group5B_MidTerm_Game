@@ -1,3 +1,4 @@
+// GLOBAL GAME STATE
 // ------------------------------------------------------------
 // main.js = the “router” (traffic controller) for the whole game
 // ------------------------------------------------------------
@@ -12,26 +13,45 @@
 //   A) stores the current screen in a single shared variable
 //   B) calls the correct draw function each frame
 //   C) sends mouse/keyboard input to the correct screen handler
-
-// ------------------------------
-// Global game state
 // ------------------------------
 // This variable is shared across all files because all files run in the same
 // global JavaScript scope when loaded in index.html.
 //
 // We store the “name” of the current screen as a string.
 // Only one screen should be active at a time.
-let currentScreen = "start";
+
+let currentScreen = "level";
+let levelData;
+let level;
+let levelInstance;
+
+let potionaryLogo, potionaryLogoDetail, startBg, levelMenu;
+let cauldronImg, recipeBookClosed, recipeBookOpen;
+let bottleBlue, bottleGreen, bottleOrange, bottlePurple;
+let crystalImg;
 
 // ------------------------------
 // preload() runs BEFORE setup() to load assets
 // ------------------------------
 // Use preload() to ensure images are loaded before they're used
+
 function preload() {
   potionaryLogo = loadImage("assets/brand/potionary-logo.png");
   potionaryLogoDetail = loadImage("assets/brand/potionary-logo-detail.svg");
   startBg = loadImage("assets/background/start-screen.png");
   levelMenu = loadImage("assets/background/level-menu.png");
+
+  // Level 1 assets
+  cauldronImg = loadImage("assets/cauldron/cauldron-1.svg");
+  recipeBookClosed = loadImage("assets/recipe/closed-recipe-book.svg");
+  recipeBookOpen = loadImage("assets/recipe/open-recipe-book.svg");
+  bottleBlue = loadImage("assets/ingredients/lvl-1-easy-blue.svg");
+  bottleGreen = loadImage("assets/ingredients/lvl-1-easy-green.svg");
+  bottleOrange = loadImage("assets/ingredients/lvl-1-easy-orange.svg");
+  bottlePurple = loadImage("assets/ingredients/lvl-1-easy-purple.svg");
+  crystalImg = loadImage("assets/ingredients/crystal.jpg");
+
+  levelData = loadJSON("levels.json");
 }
 
 // ------------------------------
@@ -40,10 +60,15 @@ function preload() {
 // This is where you usually set canvas size and initial settings.
 function setup() {
   createCanvas(1152, 648);
-
-  // Sets a default font for all text() calls
-  // (This can be changed later per-screen if you want.)
-  textFont("sans-serif");
+  levelInstance = new Level({
+    cauldronImg,
+    recipeBookClosed,
+    bottleBlue,
+    bottleGreen,
+    bottleOrange,
+    bottlePurple,
+    crystalImg,
+  });
 }
 
 // ------------------------------

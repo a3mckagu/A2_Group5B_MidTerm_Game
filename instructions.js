@@ -1,3 +1,4 @@
+// START SCREEN INSTRUCTIONS
 // NOTE: Do NOT add setup() or draw() in this file
 // setup() and draw() live in main.js
 // This file only defines:
@@ -10,6 +11,7 @@
 // ------------------------------
 // drawInstr() is called from main.js
 // only when currentScreen === "instr"
+
 function drawInstr() {
   // Light neutral background
   background(240);
