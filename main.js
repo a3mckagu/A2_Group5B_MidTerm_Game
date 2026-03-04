@@ -26,9 +26,9 @@ let level;
 let levelInstance;
 
 let potionaryLogo, potionaryLogoDetail, startBg, levelMenu;
-let cauldronImg, recipeBookClosed, recipeBookOpen;
-let bottleBlue, bottleGreen, bottleOrange, bottlePurple;
-let crystalImg;
+let levelBg, orderSheet, cauldronImg, recipeBookClosed, recipeBookOpen;
+let bottleGreen, bottleRed, bottleBlue, bottleOrange, bottlePink;
+let crystalImg, bowlImg;
 
 // ------------------------------
 // preload() runs BEFORE setup() to load assets
@@ -42,14 +42,20 @@ function preload() {
   levelMenu = loadImage("assets/background/level-menu.png");
 
   // Level 1 assets
+  levelBg = loadImage("assets/background/blue-lvl.png");
+  orderSheet = loadImage("assets/order/blank-order-sheet.png");
   cauldronImg = loadImage("assets/cauldron/cauldron-1.svg");
   recipeBookClosed = loadImage("assets/recipe/closed-recipe-book.svg");
   recipeBookOpen = loadImage("assets/recipe/open-recipe-book.svg");
-  bottleBlue = loadImage("assets/ingredients/lvl-1-easy-blue.svg");
-  bottleGreen = loadImage("assets/ingredients/lvl-1-easy-green.svg");
-  bottleOrange = loadImage("assets/ingredients/lvl-1-easy-orange.svg");
-  bottlePurple = loadImage("assets/ingredients/lvl-1-easy-purple.svg");
-  crystalImg = loadImage("assets/ingredients/crystal.jpg");
+
+  bottleGreen = loadImage("assets/ingredient-bottles/lvl-1-easy-green.svg");
+  bottleRed = loadImage("assets/ingredient-bottles/lvl-1-easy-red.svg");
+  bottleBlue = loadImage("assets/ingredient-bottles/lvl-1-easy-blue.svg");
+  bottleOrange = loadImage("assets/ingredient-bottles/lvl-1-easy-orange.svg");
+  bottlePink = loadImage("assets/ingredient-bottles/lvl-1-easy-pink.svg");
+
+  crystalImg = loadImage("assets/crystal/crystal-v2.svg");
+  bowlImg = loadImage("assets/crystal/bowl.png");
 
   levelData = loadJSON("levels.json");
 }
@@ -59,16 +65,25 @@ function preload() {
 // ------------------------------
 // This is where you usually set canvas size and initial settings.
 function setup() {
-  createCanvas(1152, 648);
+  createCanvas(windowWidth, windowHeight);
   levelInstance = new Level({
     cauldronImg,
     recipeBookClosed,
-    bottleBlue,
+    recipeBookOpen,
+    levelBg,
+    orderSheet,
     bottleGreen,
+    bottleRed,
+    bottleBlue,
     bottleOrange,
-    bottlePurple,
+    bottlePink,
     crystalImg,
+    bowlImg,
   });
+}
+
+function windowResized() {
+  resizeCanvas(windowWidth, windowHeight);
 }
 
 // ------------------------------

@@ -1,145 +1,127 @@
-// -----------------------------
-// LEVEL 1 — Base Structure + Bottle Interactivity
-// -----------------------------
+// -----------------------------------------
+// LEVEL 1 — Basic Structure + Interactivity
+// -----------------------------------------
 
-// Positions
-const cauldronPos = { x: 576, y: 374 }; // center of canvas + offset
-const crystalPos = { x: 1002, y: 344 }; // right side
-const recipeBookPos = { x: 100, y: 344 }; // left side
+const BASE_WIDTH = 1152;
+const BASE_HEIGHT = 648;
 
-// Bottles + shelf
-const shelfX = 892; // start x-position for bottles
-const shelfY = 150; // y-position for all bottles
-const bottleSpacing = 60; // horizontal spacing between bottles
+// Layout (easy to tweak later)
+const layout = {
+  cauldron: { x: 576, y: 480, w: 300 },
+  recipeBook: { x: 190, y: 530, w: 100 },
+  crystal: { x: 900, y: 455, w: 50 },
+  orderSheet: { x: 970, y: 150, w: 150 },
+  bowl: { x: 900, y: 500, w: 140 },
 
-// Sizes
-const cauldronSize = { w: 150, h: 120 };
-const crystalSize = { w: 60, h: 60 };
-const recipeBookSize = { w: 80, h: 80 };
-const bottleSize = { w: 50, h: 80 };
+  shelf: {
+    x: 120, // starting X position of the first bottle on the shelf
+    y: 132, // Y position for all bottles on the shelf
+    spacing: 80, // horizontal distance between consecutive bottles
+    bottleWidth: 38, // width of each bottle
+  },
+};
 
 class Level {
-  constructor({
-    cauldronImg,
-    recipeBookClosed,
-    bottleBlue,
-    bottleGreen,
-    bottleOrange,
-    bottlePurple,
-    crystalImg,
-  }) {
-    this.cauldronImg = cauldronImg;
-    this.recipeBookClosed = recipeBookClosed;
-    this.crystalImg = crystalImg;
-    this.cauldronPos = cauldronPos;
+  constructor(assets) {
+    this.assets = assets;
 
     // Bottles
-    this.bottles = [
-      {
-        img: bottleBlue,
-        x: shelfX,
-        y: shelfY,
-        ...bottleSize,
-        startX: shelfX,
-        startY: shelfY,
-        isSelected: false,
-        isMoving: false,
-        progress: 0,
-      },
-      {
-        img: bottleGreen,
-        x: shelfX + 1 * bottleSpacing,
-        y: shelfY,
-        ...bottleSize,
-        startX: shelfX + 1 * bottleSpacing,
-        startY: shelfY,
-        isSelected: false,
-        isMoving: false,
-        progress: 0,
-      },
-      {
-        img: bottleOrange,
-        x: shelfX + 2 * bottleSpacing,
-        y: shelfY,
-        ...bottleSize,
-        startX: shelfX + 2 * bottleSpacing,
-        startY: shelfY,
-        isSelected: false,
-        isMoving: false,
-        progress: 0,
-      },
-      {
-        img: bottlePurple,
-        x: shelfX + 3 * bottleSpacing,
-        y: shelfY,
-        ...bottleSize,
-        startX: shelfX + 3 * bottleSpacing,
-        startY: shelfY,
-        isSelected: false,
-        isMoving: false,
-        progress: 0,
-      },
+    this.bottles = [];
+    const bottleImages = [
+      assets.bottleGreen,
+      assets.bottleRed,
+      assets.bottleBlue,
+      assets.bottleOrange,
+      assets.bottlePink,
     ];
+
+    const maxPerRow = 3; // max bottles per row
+    bottleImages.forEach((img, i) => {
+      const bottleWidth = layout.shelf.bottleWidth;
+      const bottleHeight = (img.height / img.width) * bottleWidth;
+
+      const row = Math.floor(i / maxPerRow);
+      const col = i % maxPerRow;
+
+      const x = layout.shelf.x + col * layout.shelf.spacing;
+      const y = layout.shelf.y + row * (bottleHeight + 20); // 20 = vertical spacing between rows
+
+      this.bottles.push({
+        img,
+        x,
+        y,
+        startX: x,
+        startY: y,
+        isSelected: false,
+        isMoving: false,
+        progress: 0,
+      });
+    });
 
     this.selectedBottle = null;
   }
 
-  // Draw everything
   draw() {
-    background(20);
+    // Background
+    imageMode(CORNER);
+    image(this.assets.levelBg, 0, 0, BASE_WIDTH, BASE_HEIGHT);
     imageMode(CENTER);
 
-    // Cauldron
-    image(
-      this.cauldronImg,
-      cauldronPos.x,
-      cauldronPos.y,
-      cauldronSize.w,
-      cauldronSize.h,
-    );
+    // ---- ORDER SHEET ----
+    const o = layout.orderSheet;
+    const oHeight =
+      (this.assets.orderSheet.height / this.assets.orderSheet.width) * o.w;
+    image(this.assets.orderSheet, o.x, o.y, o.w, oHeight);
 
-    // Recipe book
-    image(
-      this.recipeBookClosed,
-      recipeBookPos.x,
-      recipeBookPos.y,
-      recipeBookSize.w,
-      recipeBookSize.h,
-    );
+    // ---- CAULDRON ----
+    const c = layout.cauldron;
+    const cHeight =
+      (this.assets.cauldronImg.height / this.assets.cauldronImg.width) * c.w;
 
-    // Crystal
-    image(
-      this.crystalImg,
-      crystalPos.x,
-      crystalPos.y,
-      crystalSize.w,
-      crystalSize.h,
-    );
+    image(this.assets.cauldronImg, c.x, c.y, c.w, cHeight);
 
-    // Bottles + animation
+    // ---- RECIPE BOOK CLOSED ----
+    const r = layout.recipeBook;
+    const rHeight =
+      (this.assets.recipeBookClosed.height /
+        this.assets.recipeBookClosed.width) *
+      r.w;
+
+    image(this.assets.recipeBookClosed, r.x, r.y, r.w, rHeight);
+
+    // ---- BOWL ----
+    const b = layout.bowl;
+    const bHeight =
+      (this.assets.bowlImg.height / this.assets.bowlImg.width) * b.w;
+    image(this.assets.bowlImg, b.x, b.y, b.w, bHeight);
+
+    // ---- CRYSTAL ----
+    const cr = layout.crystal;
+    const crHeight =
+      (this.assets.crystalImg.height / this.assets.crystalImg.width) * cr.w;
+
+    image(this.assets.crystalImg, cr.x, cr.y, cr.w, crHeight);
+
+    // ---- BOTTLES ----
     this.bottles.forEach((b) => {
       if (b.isMoving) {
-        const targetX = this.cauldronPos.x;
-        const targetY = this.cauldronPos.y - cauldronSize.h / 2 - b.h / 2 - 10; // above cauldron
-        const speed = 0.02; // slower movement
+        const targetX = layout.cauldron.x - 20;
+        const targetY = layout.cauldron.y - 160;
 
+        const speed = 0.02;
         b.progress += speed;
 
         if (b.progress < 1) {
-          // Phase 1: move toward cauldron
           b.x = lerp(b.startX, targetX, b.progress);
           b.y = lerp(b.startY, targetY, b.progress);
         } else if (b.progress < 1.5) {
-          // Phase 2: pause over cauldron (pouring)
           b.x = targetX;
           b.y = targetY;
         } else if (b.progress < 2.5) {
-          // Phase 3: move back to start
-          const backProgress = (b.progress - 1.5) / 1; // normalize 0 → 1
-          b.x = lerp(targetX, b.startX, backProgress);
-          b.y = lerp(targetY, b.startY, backProgress);
+          const back = (b.progress - 1.5) / 1;
+          b.x = lerp(targetX, b.startX, back);
+          b.y = lerp(targetY, b.startY, back);
         } else {
-          // Done
           b.isMoving = false;
           b.isSelected = false;
           b.progress = 0;
@@ -148,39 +130,46 @@ class Level {
         }
       }
 
-      // Draw bottle with tilt while over cauldron
+      const bottleWidth = layout.shelf.bottleWidth;
+      const bottleHeight = (b.img.height / b.img.width) * bottleWidth;
+
       push();
       translate(b.x, b.y);
+
       let angle = 0;
       if (b.isMoving && b.progress >= 0.5 && b.progress < 2) {
-        angle = -PI / 3; // tilt while approaching, pausing, and returning
+        angle = PI / 2.5;
       }
-      rotate(angle);
-      image(b.img, 0, 0, b.w, b.h);
-      pop();
 
-      // Highlight if selected
+      rotate(angle);
+
+      // ---- Selection Outline (slightly rounded rectangle) ----
       if (b.isSelected) {
-        rectMode(CENTER);
-        stroke(255, 255, 0);
-        strokeWeight(3);
         noFill();
-        rect(b.x, b.y, b.w + 10, b.h + 10);
+        stroke(255); // white outline
+        strokeWeight(2); // thickness
+        rectMode(CENTER);
+        rect(0, 0, bottleWidth + 10, bottleHeight + 10, 8); // 8 = corner radius
       }
+
+      // ---- Draw the bottle ----
+      noStroke();
+      image(b.img, 0, 0, bottleWidth, bottleHeight);
+
+      pop();
     });
-    imageMode(CORNER);
   }
 
-  // Select bottle when clicked
   selectBottle(mx, my) {
     this.bottles.forEach((b) => {
-      const halfW = b.w / 2;
-      const halfH = b.h / 2;
+      const w = layout.shelf.bottleWidth;
+      const h = (b.img.height / b.img.width) * w;
+
       if (
-        mx > b.x - halfW &&
-        mx < b.x + halfW &&
-        my > b.y - halfH &&
-        my < b.y + halfH
+        mx > b.x - w / 2 &&
+        mx < b.x + w / 2 &&
+        my > b.y - h / 2 &&
+        my < b.y + h / 2
       ) {
         this.selectedBottle = b;
         b.isSelected = true;
@@ -190,7 +179,6 @@ class Level {
     });
   }
 
-  // Pour selected bottle
   pourSelectedBottle() {
     if (this.selectedBottle && !this.selectedBottle.isMoving) {
       this.selectedBottle.isMoving = true;
@@ -199,46 +187,56 @@ class Level {
   }
 }
 
-// ------------------------------------------------------------
-// Level screen functions
-// ------------------------------------------------------------
+// -----------------------------
+// DRAW WRAPPER (scaling system)
+// -----------------------------
 function drawLevel() {
-  if (levelInstance) {
-    levelInstance.draw();
-  } else {
-    background(50);
-    fill(255);
-    textAlign(CENTER, CENTER);
-    textSize(32);
-    text("Level not loaded!", width / 2, height / 2);
-  }
+  background(0);
+
+  if (!levelInstance) return;
+
+  const scaleFactor = min(width / BASE_WIDTH, height / BASE_HEIGHT);
+
+  const offsetX = (width - BASE_WIDTH * scaleFactor) / 2;
+  const offsetY = (height - BASE_HEIGHT * scaleFactor) / 2;
+
+  push();
+  translate(offsetX, offsetY);
+  scale(scaleFactor);
+
+  levelInstance.draw();
+
+  pop();
 }
 
-// function levelMousePressed() {
-//   if (levelInstance) {
-//     // Click a bottle
-//     levelInstance.selectBottle(mouseX, mouseY);
-
-//     // Click cauldron
-//     const c = levelInstance.cauldronPos;
-//     const cauldronRadius = 75; // approx half width
-//     if (dist(mouseX, mouseY, c.x, c.y) < cauldronRadius) {
-//       levelInstance.pourSelectedBottle();
-//     }
-//   }
-// }
-
 function levelMousePressed() {
-  console.log("Mouse pressed at", mouseX, mouseY);
-  if (levelInstance) {
-    levelInstance.selectBottle(mouseX, mouseY);
-    console.log("Selected bottle:", levelInstance.selectedBottle?.img);
+  if (!levelInstance) return;
 
-    const c = levelInstance.cauldronPos;
-    if (dist(mouseX, mouseY, c.x, c.y) < 75) {
-      console.log("Cauldron clicked!");
-      levelInstance.pourSelectedBottle();
-    }
+  const scaleFactor = min(width / BASE_WIDTH, height / BASE_HEIGHT);
+
+  const offsetX = (width - BASE_WIDTH * scaleFactor) / 2;
+  const offsetY = (height - BASE_HEIGHT * scaleFactor) / 2;
+
+  const adjustedX = (mouseX - offsetX) / scaleFactor;
+  const adjustedY = (mouseY - offsetY) / scaleFactor;
+
+  levelInstance.selectBottle(adjustedX, adjustedY);
+
+  // ---- CAULDRON CLICK ----
+  const c = layout.cauldron;
+  const cWidth = c.w;
+  const cHeight =
+    (levelInstance.assets.cauldronImg.height /
+      levelInstance.assets.cauldronImg.width) *
+    c.w;
+
+  if (
+    adjustedX > c.x - cWidth / 2 &&
+    adjustedX < c.x + cWidth / 2 &&
+    adjustedY > c.y - cHeight / 2 &&
+    adjustedY < c.y + cHeight / 2
+  ) {
+    levelInstance.pourSelectedBottle();
   }
 }
 
