@@ -7,7 +7,7 @@ const cauldronPos = { x: 576, y: 374 }; // center of canvas + offset
 const crystalPos = { x: 1002, y: 344 }; // right side
 const recipeBookPos = { x: 100, y: 344 }; // left side
 
-// Bottles & shelf
+// Bottles + shelf
 const shelfX = 892; // start x-position for bottles
 const shelfY = 150; // y-position for all bottles
 const bottleSpacing = 60; // horizontal spacing between bottles
@@ -118,23 +118,28 @@ class Level {
 
     // Bottles + animation
     this.bottles.forEach((b) => {
-      // Animate if moving
       if (b.isMoving) {
         const targetX = this.cauldronPos.x;
-        const targetY = this.cauldronPos.y;
+        const targetY = this.cauldronPos.y - cauldronSize.h / 2 - b.h / 2 - 10; // above cauldron
+        const speed = 0.02; // slower movement
 
-        b.progress += 0.05; // adjust speed
+        b.progress += speed;
+
         if (b.progress < 1) {
-          // move to cauldron
+          // Phase 1: move toward cauldron
           b.x = lerp(b.startX, targetX, b.progress);
           b.y = lerp(b.startY, targetY, b.progress);
-        } else if (b.progress < 2) {
-          // move back to start
-          const backProgress = b.progress - 1;
+        } else if (b.progress < 1.5) {
+          // Phase 2: pause over cauldron (pouring)
+          b.x = targetX;
+          b.y = targetY;
+        } else if (b.progress < 2.5) {
+          // Phase 3: move back to start
+          const backProgress = (b.progress - 1.5) / 1; // normalize 0 → 1
           b.x = lerp(targetX, b.startX, backProgress);
           b.y = lerp(targetY, b.startY, backProgress);
         } else {
-          // done
+          // Done
           b.isMoving = false;
           b.isSelected = false;
           b.progress = 0;
@@ -143,11 +148,20 @@ class Level {
         }
       }
 
-      // Draw bottle
-      image(b.img, b.x, b.y, b.w, b.h);
+      // Draw bottle with tilt while over cauldron
+      push();
+      translate(b.x, b.y);
+      let angle = 0;
+      if (b.isMoving && b.progress >= 0.5 && b.progress < 2) {
+        angle = -PI / 3; // tilt while approaching, pausing, and returning
+      }
+      rotate(angle);
+      image(b.img, 0, 0, b.w, b.h);
+      pop();
 
-      // Draw selection highlight if selected
+      // Highlight if selected
       if (b.isSelected) {
+        rectMode(CENTER);
         stroke(255, 255, 0);
         strokeWeight(3);
         noFill();
