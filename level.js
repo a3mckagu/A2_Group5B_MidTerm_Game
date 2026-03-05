@@ -489,4 +489,9 @@ function levelMousePressed() {
   }
 }
 
-function levelKeyPressed() {}
+function levelKeyPressed() {
+  // ESC returns to start screen
+  if (keyCode === ESCAPE) {
+    currentScreen = "start";
+  }
+}

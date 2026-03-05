@@ -6,53 +6,68 @@
 // currentScreen === "map"
 
 function drawMap() {
-  // Background colour for the start screen
-  background(levelMenu); // soft teal background
+  background(0);
 
-  // Center the logo images on the screen
+  const BASE_WIDTH = 1152;
+  const BASE_HEIGHT = 648;
+  const scaleFactor = min(width / BASE_WIDTH, height / BASE_HEIGHT);
+  const offsetX = (width - BASE_WIDTH * scaleFactor) / 2;
+  const offsetY = (height - BASE_HEIGHT * scaleFactor) / 2;
 
-  // ---- Buttons (data only) ----
-  // These objects store the position/size/label for each button.
-  // Using objects makes it easy to pass them into drawButton()
-  // and also reuse the same information for hover checks.
+  push();
+  translate(offsetX, offsetY);
+  scale(scaleFactor);
+  image(levelMenu, 0, 0, BASE_WIDTH, BASE_HEIGHT);
+  pop();
 
+  // Draw map icons with individual position and width control
+  // Icon configuration - edit these values directly
+  const icon1Config = {
+    icon: mapIcon1,
+    x: width * 0.28 + 17,
+    y: height * 0.7,
+    width: 150,
+  };
+  const iconConfigs = [
+    icon1Config,
+    { icon: mapIcon2, x: width * 0.37 + 17, y: height * 0.5, width: 150 },
+    { icon: mapIcon3, x: width * 0.48 + 17, y: height * 0.64, width: 200 },
+    { icon: mapIcon4, x: width * 0.62 + 17, y: height * 0.47, width: 245 },
+  ];
+
+  iconConfigs.forEach((config) => {
+    if (config.icon) {
+      const aspectRatio = config.icon.height / config.icon.width;
+      const iconHeight = config.width * aspectRatio;
+      imageMode(CENTER);
+      image(config.icon, config.x, config.y, config.width, iconHeight);
+      imageMode(CORNER);
+    }
+  });
+
+  fill("#ceb53a");
   textFont("Fraunces");
-  textSize(17);
+  textSize(42);
   textStyle(BOLD);
   textAlign(CENTER, CENTER);
-  const startBtn = {
-    x: width / 2,
-    y: 338, // Andreea changed manually
-    w: 190,
-    h: 45,
-    label: "New Game",
-  };
-
-  const instrBtn = {
-    x: width / 2,
-    y: 390, // Andreea changed manually
-    w: 276,
-    h: 45,
-    label: "Guide",
-  };
-  const quitBtn = {
-    x: width / 2,
-    y: 445, // Andreea changed manually
-    w: 190,
-    h: 45,
-    label: "Quit",
-  };
-
-  // Draw both buttons
-  drawButton(startBtn);
-  drawButton(instrBtn);
-  drawButton(quitBtn);
+  text("Alchemy Map", width / 2, height * 0.14);
 
   // ---- Cursor feedback ----
-  // If the mouse is over either button, show a hand cursor
-  // so the player knows it is clickable.
-  const over = isHover(startBtn) || isHover(instrBtn) || isHover(quitBtn);
-  cursor(over ? HAND : ARROW);
+  // Show hand cursor when hovering over icon1 or the circular button
+  const icon1AspectRatio = mapIcon1.height / mapIcon1.width;
+  const icon1Height = icon1Config.width * icon1AspectRatio;
+  const isOverIcon1 = isIconHover(
+    icon1Config.x,
+    icon1Config.y,
+    icon1Config.width,
+    icon1Height,
+  );
+
+  if (isOverIcon1) {
+    cursor(HAND);
+  } else {
+    cursor(ARROW);
+  }
 }
 
 // ------------------------------------------------------------
@@ -60,19 +75,15 @@ function drawMap() {
 // ------------------------------------------------------------
 // Called from main.js only when currentScreen === "map"
 function mapMousePressed() {
-  // For input checks, we only need x,y,w,h (label is optional)
-  const startBtn = { x: width / 2, y: 560, w: 290, h: 52 };
-  const instrBtn = { x: width / 2, y: 620, w: 290, h: 52 };
+  // Check if mapIcon1 is clicked
+  const icon1AspectRatio = mapIcon1.height / mapIcon1.width;
+  const icon1Height = 150 * icon1AspectRatio; // 150 is the width from icon1Config
+  const icon1Config = { x: width * 0.28 + 17, y: height * 0.7, width: 150 };
 
-  // If START is clicked, go to the map screen
-  if (isHover(startBtn)) {
+  if (
+    isIconHover(icon1Config.x, icon1Config.y, icon1Config.width, icon1Height)
+  ) {
     currentScreen = "level";
-  }
-  // If INSTRUCTIONS is clicked, go to the instructions screen
-  else if (isHover(instrBtn)) {
-    currentScreen = "instr";
-  } else if (isHover(quitBtn)) {
-    currentScreen = "start";
   }
 }
 
@@ -88,6 +99,11 @@ function mapKeyPressed() {
   }
 
   if (key === "s" || key === "S") {
+    currentScreen = "start";
+  }
+
+  // ESC returns to start screen
+  if (keyCode === ESCAPE) {
     currentScreen = "start";
   }
 }
@@ -134,4 +150,37 @@ function drawButton({ x, y, w, h, label }) {
   textStyle(BOLD);
   textAlign(CENTER, CENTER);
   text(label, x, y);
+}
+
+// Helper: isCircleHover()
+// Checks if the mouse is over a circular button.
+function isCircleHover({ x, y, diameter }) {
+  const radius = diameter / 2;
+  const distance = dist(mouseX, mouseY, x, y);
+  return distance < radius;
+}
+
+// Helper: isIconHover()
+// Checks if the mouse is over a rectangular icon
+function isIconHover(x, y, width, height) {
+  return (
+    mouseX > x - width / 2 &&
+    mouseX < x + width / 2 &&
+    mouseY > y - height / 2 &&
+    mouseY < y + height / 2
+  );
+}
+
+// Helper: drawCircleButton()
+// Draws a circular button with "click me" text.
+function drawCircleButton({ x, y, diameter }) {
+  fill(255);
+  noStroke();
+  ellipseMode(CENTER);
+  ellipse(x, y, diameter, diameter);
+
+  fill(0);
+  textSize(18);
+  textAlign(CENTER, CENTER);
+  text("Begin", x, y);
 }

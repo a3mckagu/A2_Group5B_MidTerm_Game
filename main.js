@@ -20,7 +20,7 @@
 // We store the “name” of the current screen as a string.
 // Only one screen should be active at a time.
 
-let currentScreen = "level";
+let currentScreen = "start";
 let levelData;
 let level;
 let levelInstance;
@@ -30,6 +30,7 @@ let levelBg, orderSheet, cauldronImg, recipeBookClosed, recipeBookOpen;
 let bottleGreen, bottleRed, bottleBlue, bottleOrange, bottlePink;
 let crystalImg, bowlImg;
 let greenSymbol, blueSymbol, orangeSymbol;
+let mapIcon1, mapIcon2, mapIcon3, mapIcon4;
 
 // ------------------------------
 // preload() runs BEFORE setup() to load assets
@@ -61,6 +62,12 @@ function preload() {
   greenSymbol = loadImage("assets/symbols/green-symbol.svg");
   blueSymbol = loadImage("assets/symbols/blue-symbol.svg");
   orangeSymbol = loadImage("assets/symbols/orange-symbol.svg");
+
+  // Map screen icons
+  mapIcon1 = loadImage("assets/background/map-icon_1.svg");
+  mapIcon2 = loadImage("assets/background/map-icon_2.svg");
+  mapIcon3 = loadImage("assets/background/map-icon_3.svg");
+  mapIcon4 = loadImage("assets/background/map-icon_4.svg");
 
   levelData = loadJSON("levels.json");
 }

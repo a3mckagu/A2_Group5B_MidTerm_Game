@@ -11,44 +11,58 @@
 // currentScreen === "start"
 
 function drawStart() {
-  // Background colour for the start screen
-  background(startBg); // soft teal background
+  background(0);
+
+  const BASE_WIDTH = 1152;
+  const BASE_HEIGHT = 648;
+  const scaleFactor = min(width / BASE_WIDTH, height / BASE_HEIGHT);
+  const offsetX = (width - BASE_WIDTH * scaleFactor) / 2;
+  const offsetY = (height - BASE_HEIGHT * scaleFactor) / 2;
+
+  push();
+  translate(offsetX, offsetY);
+  scale(scaleFactor);
+  image(startBg, 0, 0, BASE_WIDTH, BASE_HEIGHT);
 
   // Center the logo images on the screen
   imageMode(CENTER);
-  image(potionaryLogo, width / 2, height / 2 - 146, 449, 134);
-  image(potionaryLogoDetail, width / 2, height / 2 - 76, 155, 30);
+  image(potionaryLogo, BASE_WIDTH / 2, BASE_HEIGHT / 2 - 146, 449, 134);
+  image(potionaryLogoDetail, BASE_WIDTH / 2, BASE_HEIGHT / 2 - 76, 155, 30);
   imageMode(CORNER); // Reset to default mode
+  pop();
 
   // ---- Buttons (data only) ----
-  // These objects store the position/size/label for each button.
-  // Using objects makes it easy to pass them into drawButton()
-  // and also reuse the same information for hover checks.
+  // Responsive button sizing based on viewport
+  const btnScaleFactor = min(width / 1024, height / 768);
+  const btnWidth1 = 190 * btnScaleFactor;
+  const btnWidth2 = 276 * btnScaleFactor;
+  const btnHeight = 45 * btnScaleFactor;
+  const btnTextSize = 17 * btnScaleFactor;
 
   textFont("Fraunces");
-  textSize(17);
+  textSize(btnTextSize);
   textStyle(BOLD);
   textAlign(CENTER, CENTER);
   const startBtn = {
     x: width / 2,
-    y: 338, // Andreea changed manually
-    w: 190,
-    h: 45,
+    y: height * 0.52,
+    w: btnWidth1,
+    h: btnHeight,
     label: "New Game",
   };
 
   const instrBtn = {
     x: width / 2,
-    y: 390, // Andreea changed manually
-    w: 276,
-    h: 45,
-    label: "Guide",
+    y: height * 0.6,
+    w: btnWidth2,
+    h: btnHeight,
+    label: "Alchemist's Guide",
   };
   const quitBtn = {
     x: width / 2,
-    y: 445, // Andreea changed manually
-    w: 190,
-    h: 45,
+    y: height * 0.68,
+    w: btnWidth1,
+    h: btnHeight,
     label: "Quit",
   };
 
@@ -69,10 +83,31 @@ function drawStart() {
 // ------------------------------------------------------------
 // Called from main.js only when currentScreen === "start"
 function startMousePressed() {
+  // Must match the button sizing in drawStart()
+  const btnScaleFactor = min(width / 1024, height / 768);
+  const btnWidth1 = 190 * btnScaleFactor;
+  const btnWidth2 = 276 * btnScaleFactor;
+  const btnHeight = 45 * btnScaleFactor;
+
   // For input checks, we only need x,y,w,h (label is optional)
-  const startBtn = { x: width / 2, y: 338, w: 190, h: 45 };
-  const instrBtn = { x: width / 2, y: 390, w: 276, h: 45 };
-  const quitBtn = { x: width / 2, y: 445, w: 190, h: 45 };
+  const startBtn = {
+    x: width / 2,
+    y: height * 0.52,
+    w: btnWidth1,
+    h: btnHeight,
+  };
+  const instrBtn = {
+    x: width / 2,
+    y: height * 0.6,
+    w: btnWidth2,
+    h: btnHeight,
+  };
+  const quitBtn = {
+    x: width / 2,
+    y: height * 0.68,
+    w: btnWidth1,
+    h: btnHeight,
+  };
 
   // If START is clicked, go to the map screen
   if (isHover(startBtn)) {
@@ -99,6 +134,11 @@ function startKeyPressed() {
 
   if (key === "g" || key === "G") {
     currentScreen = "instr";
+  }
+
+  // ESC returns to start (already on start, so no action needed)
+  if (keyCode === ESCAPE) {
+    // Already on start screen
   }
 }
 

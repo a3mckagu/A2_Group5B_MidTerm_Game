@@ -28,11 +28,10 @@ function drawInstr() {
   // \n creates a line break in the text
   // This is useful for simple multi-line instructions
   const lines =
-    "Each screen has 2 choices.\n\n" +
-    "Press the choices, or hit 1 or 2 to advance the story.\n\n" +
-    "Press ESCAPE to return to main menu.\n\n" +
-    "Careful, decisions have consequence.\n\n" +
-    "You have a chance to win or lose!";
+    "You have inherited a powerful recipe guide\n\n" +
+    "Click on potion bottles then click on the cauldron to carry out recipes.\n\n" +
+    "Press ESCAPE to return to main menu at any time.\n\n" +
+    "Careful, decisions have consequence.\n\n";
 
   text(lines, width / 2, 160);
 
