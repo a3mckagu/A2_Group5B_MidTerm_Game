@@ -5,34 +5,35 @@
 // drawMap() is called from main.js only when:
 // currentScreen === "map"
 
+const BASE_W = 1152;
+const BASE_H = 648;
+
 function drawMap() {
   background(0);
 
-  const BASE_WIDTH = 1152;
-  const BASE_HEIGHT = 648;
-  const scaleFactor = min(width / BASE_WIDTH, height / BASE_HEIGHT);
-  const offsetX = (width - BASE_WIDTH * scaleFactor) / 2;
-  const offsetY = (height - BASE_HEIGHT * scaleFactor) / 2;
+  const scaleFactor = min(width / BASE_W, height / BASE_H);
+  const offsetX = (width - BASE_W * scaleFactor) / 2;
+  const offsetY = (height - BASE_H * scaleFactor) / 2;
 
   push();
   translate(offsetX, offsetY);
   scale(scaleFactor);
-  image(levelMenu, 0, 0, BASE_WIDTH, BASE_HEIGHT);
-  pop();
 
-  // Draw map icons with individual position and width control
-  // Icon configuration - edit these values directly
+  // Draw background (in base coordinates)
+  image(levelMenu, 0, 0, BASE_W, BASE_H);
+
+  // Draw map icons using base coordinates so they scale with the canvas
   const icon1Config = {
     icon: mapIcon1,
-    x: width * 0.28 + 17,
-    y: height * 0.7,
+    x: BASE_W * 0.28 + 17,
+    y: BASE_H * 0.7,
     width: 150,
   };
   const iconConfigs = [
     icon1Config,
-    { icon: mapIcon2, x: width * 0.37 + 17, y: height * 0.5, width: 150 },
-    { icon: mapIcon3, x: width * 0.48 + 17, y: height * 0.64, width: 200 },
-    { icon: mapIcon4, x: width * 0.62 + 17, y: height * 0.47, width: 245 },
+    { icon: mapIcon2, x: BASE_W * 0.37 + 17, y: BASE_H * 0.5, width: 150 },
+    { icon: mapIcon3, x: BASE_W * 0.48 + 17, y: BASE_H * 0.64, width: 200 },
+    { icon: mapIcon4, x: BASE_W * 0.62 + 17, y: BASE_H * 0.47, width: 245 },
   ];
 
   iconConfigs.forEach((config) => {
@@ -45,29 +46,34 @@ function drawMap() {
     }
   });
 
+  // Title in base coordinates
   fill("#ceb53a");
   textFont("Fraunces");
   textSize(42);
   textStyle(BOLD);
   textAlign(CENTER, CENTER);
-  text("Alchemy Map", width / 2, height * 0.14);
+  text("Alchemy Map", BASE_W / 2, BASE_H * 0.14);
+
+  // Calculate hover using transformed mouse coords
+  const adjustedMX = (mouseX - offsetX) / scaleFactor;
+  const adjustedMY = (mouseY - offsetY) / scaleFactor;
 
   // ---- Cursor feedback ----
-  // Show hand cursor when hovering over icon1 or the circular button
   const icon1AspectRatio = mapIcon1.height / mapIcon1.width;
   const icon1Height = icon1Config.width * icon1AspectRatio;
   const isOverIcon1 = isIconHover(
+    adjustedMX,
+    adjustedMY,
     icon1Config.x,
     icon1Config.y,
     icon1Config.width,
     icon1Height,
   );
 
-  if (isOverIcon1) {
-    cursor(HAND);
-  } else {
-    cursor(ARROW);
-  }
+  pop();
+
+  if (isOverIcon1) cursor(HAND);
+  else cursor(ARROW);
 }
 
 // ------------------------------------------------------------

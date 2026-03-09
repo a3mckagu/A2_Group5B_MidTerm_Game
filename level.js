@@ -5,13 +5,23 @@
 const BASE_WIDTH = 1152;
 const BASE_HEIGHT = 648;
 
+// Returns scale factor and letterbox offsets for current canvas size
+function getScaleAndOffset() {
+  const scaleFactor = min(width / BASE_WIDTH, height / BASE_HEIGHT);
+  const offsetX = (width - BASE_WIDTH * scaleFactor) / 2;
+  const offsetY = (height - BASE_HEIGHT * scaleFactor) / 2;
+  return { scaleFactor, offsetX, offsetY };
+}
 // Layout (easy to tweak later)
 const layout = {
-  cauldron: { x: 576, y: 480, w: 300 },
-  recipeBook: { x: 190, y: 530, w: 100 },
-  crystal: { x: 900, y: 455, w: 36 },
+  cauldron: { x: BASE_WIDTH / 2, y: 490, w: 300 },
+  // moved to bottom-right quadrant (closer to the right/bottom edges)
+  // nudged slightly down and a bit smaller
+  recipeBook: { x: 1000, y: 540, w: 120 },
+  // nudged left a bit to balance layout
+  crystal: { x: 820, y: 455, w: 36 },
   orderSheet: { x: 940, y: 210, w: 150 },
-  bowl: { x: 900, y: 500, w: 140 },
+  bowl: { x: 820, y: 500, w: 140 },
   envelope: { x: 1100, y: 50, w: 50 },
 
   shelf: {
@@ -26,55 +36,97 @@ class Level {
   constructor(assets) {
     this.assets = assets;
 
-    // Bottles
-    this.bottles = [];
-    const bottleImages = [
-      assets.bottleGreen,
-      assets.bottleRed,
-      assets.bottleBlue,
-      assets.bottleOrange,
-      assets.bottlePink,
+    // ---- VIALS CONFIGURATION ----
+    // Define all vials (regular bottles + crystal) with their properties
+    const vialsConfig = [
+      {
+        id: "green",
+        img: assets.bottleGreen,
+        symbol: assets.greenSymbol,
+        colour: "green",
+      },
+      {
+        id: "red",
+        img: assets.bottleRed,
+        symbol: assets.greenSymbol, // Note: red has same symbol as green for now
+        colour: "red",
+      },
+      {
+        id: "blue",
+        img: assets.bottleBlue,
+        symbol: assets.blueSymbol,
+        colour: "blue",
+      },
+      {
+        id: "orange",
+        img: assets.bottleOrange,
+        symbol: assets.orangeSymbol,
+        colour: "orange",
+      },
+      {
+        id: "pink",
+        img: assets.bottlePink,
+        symbol: assets.greenSymbol, // Note: pink has same symbol as green for now
+        colour: "pink",
+      },
+      {
+        id: "crystal",
+        img: assets.crystalImg,
+        symbol: assets.crystalImg, // Crystal uses itself as symbol in recipe
+        colour: "crystal",
+        isCrystal: true,
+      },
     ];
 
+    // Initialize vials array with runtime state
+    this.vials = [];
     const maxPerRow = 3; // max bottles per row
-    bottleImages.forEach((img, i) => {
-      const bottleWidth = layout.shelf.bottleWidth;
-      const bottleHeight = (img.height / img.width) * bottleWidth;
 
-      const row = Math.floor(i / maxPerRow);
-      const col = i % maxPerRow;
+    vialsConfig.forEach((config, i) => {
+      let x, y, w, h;
 
-      const x = layout.shelf.x + col * layout.shelf.spacing;
-      const y = layout.shelf.y + row * (bottleHeight + 20);
+      if (config.isCrystal) {
+        // Crystal position from layout
+        const cr = layout.crystal;
+        w = cr.w;
+        h = (config.img.height / config.img.width) * w;
+        x = cr.x;
+        y = cr.y;
+      } else {
+        // Regular bottles positioned on shelf
+        w = layout.shelf.bottleWidth;
+        h = (config.img.height / config.img.width) * w;
 
-      this.bottles.push({
-        img,
+        const row = Math.floor(i / maxPerRow);
+        const col = i % maxPerRow;
+
+        x = layout.shelf.x + col * layout.shelf.spacing;
+        y = layout.shelf.y + row * (h + 20);
+      }
+
+      this.vials.push({
+        ...config,
         x,
         y,
         startX: x,
         startY: y,
+        width: w,
+        height: h,
         isSelected: false,
         isMoving: false,
         progress: 0,
+        used: false,
+        isHeld: false,
+        scale: 1.0,
+        targetScale: 1.0,
+        droppedFromHeld: false,
+        pourX: 0,
+        pourY: 0,
       });
     });
 
-    // Add the crystal as a special "bottle"
-    const cr = layout.crystal;
-    const crystalWidth = cr.w;
-    const crystalHeight =
-      (assets.crystalImg.height / assets.crystalImg.width) * crystalWidth;
-    this.bottles.push({
-      img: assets.crystalImg,
-      x: cr.x,
-      y: cr.y,
-      startX: cr.x,
-      startY: cr.y,
-      isSelected: false,
-      isMoving: false,
-      progress: 0,
-      isCrystal: true, // flag to treat differently in animation
-    });
+    // For backwards compatibility, alias to bottles
+    this.bottles = this.vials;
 
     this.selectedBottle = null;
     this.isRecipeOpen = false;
@@ -92,6 +144,9 @@ class Level {
     ];
     this.levelResult = null; // "CORRECT" or "WRONG"
     this.crystalAdded = false; // Track whether the crystal has been added to cauldron
+    // Drop zone placed above the cauldron; radius adjustable
+    // default radius reduced for a smaller outline
+    this.dropZone = { x: layout.cauldron.x, y: layout.cauldron.y - 220, r: 26 };
   }
 
   checkSequence() {
@@ -199,7 +254,26 @@ class Level {
     const b = layout.bowl;
     const bHeight =
       (this.assets.bowlImg.height / this.assets.bowlImg.width) * b.w;
-    image(this.assets.bowlImg, b.x, b.y, b.w, bHeight);
+
+    // Align bottom of bowl with bottom of recipe book
+    const rb = layout.recipeBook;
+    const rbHeight =
+      (this.assets.recipeBookClosed.height /
+        this.assets.recipeBookClosed.width) *
+      rb.w;
+    const desiredBowlY = rb.y + rbHeight / 2 - bHeight / 2;
+
+    image(this.assets.bowlImg, b.x, desiredBowlY, b.w, bHeight);
+
+    // Keep crystal positioned relative to the bowl when not moving
+    const crystalYOffset = layout.bowl.y - layout.crystal.y; // original offset
+    const crystalVial = this.vials.find((v) => v.isCrystal);
+    if (crystalVial && !crystalVial.isMoving) {
+      crystalVial.x = b.x;
+      crystalVial.y = desiredBowlY - crystalYOffset;
+      crystalVial.startX = crystalVial.x;
+      crystalVial.startY = crystalVial.y;
+    }
 
     // ---- CRYSTAL — draw BEHIND cauldron only during the drop phase ----
     const crystal = this.bottles.find((b) => b.isCrystal);
@@ -224,6 +298,80 @@ class Level {
       (this.assets.cauldronImg.height / this.assets.cauldronImg.width) * c.w;
     image(this.assets.cauldronImg, c.x, c.y, c.w, cHeight);
 
+    // ---- CAULDRON RIM — golden ring precisely at the cauldron opening ----
+    if (this.dropZone) {
+      // Compute rim position using cauldron image bounds.
+      // c.x/c.y are the image center; the top of the cauldron is at c.y - cHeight/2.
+      // The visible opening is a bit down from the absolute top; tune with a fraction.
+      const openingFraction = 0.08; // slightly higher at the very top of the cauldron
+      const rimY = c.y - cHeight / 2 + cHeight * openingFraction;
+
+      // Make the ring fit the opening width (narrower than full cauldron width)
+      const ringWidth = c.w * 0.4;
+      const ringHeight = cHeight * 0.095; // slightly shallower ellipse
+
+      push();
+      translate(c.x, rimY);
+      noFill();
+
+      // Subtle glow behind the ring
+      stroke(200, 165, 50, 110);
+      strokeWeight(5);
+      ellipse(0, 0, ringWidth + 8, ringHeight + 4);
+
+      // Main gold ring (slightly thicker)
+      stroke(255, 215, 90, 230);
+      strokeWeight(3.4);
+      ellipse(0, 0, ringWidth, ringHeight);
+
+      pop();
+      // Update drop zone so it covers a vertical span that starts a bit
+      // above the top of the golden ring and ends at the bottom of the ring.
+      // We'll represent the zone as an ellipse (rx, ry) so horizontal hits
+      // near the ring edges work reliably.
+      const dzExtra = 80; // extra pixels above the ring top to include (a bit taller)
+      const ringTop = rimY - ringHeight / 2;
+      const ringBottom = rimY + ringHeight / 2;
+      const dzTop = ringTop - dzExtra; // desired top of drop area
+      const dzBottom = ringBottom; // desired bottom of drop area
+      const dzCenterY = (dzTop + dzBottom) / 2;
+
+      // Base horizontal radius (center), and asymmetric top/bottom radii
+      const baseRx = (ringWidth / 2) * 1.15; // horizontal radius (a bit wider than ring)
+      const ry = (dzBottom - dzTop) / 2; // vertical radius to cover top->bottom
+
+      // Make bottom wider than top so the hit area flares outward near the rim
+      const rxTop = baseRx * 0.9; // slightly narrower near the top
+      const rxBottom = baseRx * 1.35; // wider near the bottom
+
+      this.dropZone.x = c.x;
+      this.dropZone.y = dzCenterY;
+      this.dropZone.rx = baseRx; // keep a central reference
+      this.dropZone.rxTop = rxTop;
+      this.dropZone.rxBottom = rxBottom;
+      this.dropZone.ry = ry;
+      // store explicit vertical bounds for interpolation in hit-tests
+      this.dropZone.top = dzTop;
+      this.dropZone.bottom = dzBottom;
+      // keep r for backward compatibility (max radius)
+      this.dropZone.r = max(baseRx, ry, rxBottom);
+      // Actual hit radius: use bottom (orange) ellipse but slightly less wide
+      this.dropZone.actualRx = rxBottom * 0.95;
+
+      // Debug: draw only the actual active hit area (white ellipse)
+      push();
+      noFill();
+      stroke(255, 255, 255, 180);
+      strokeWeight(1.2);
+      ellipse(
+        this.dropZone.x,
+        this.dropZone.y,
+        this.dropZone.actualRx * 2,
+        ry * 2,
+      );
+      pop();
+    }
+
     // ---- RECIPE BOOK ----
     const r = layout.recipeBook;
     const rHeight =
@@ -233,7 +381,8 @@ class Level {
 
     if (this.isRecipeOpen) {
       push();
-      fill(0, 150);
+      // Brown overlay placeholder (will be replaced with an image)
+      fill("#68452E");
       rectMode(CORNER);
       rect(0, 0, BASE_WIDTH, BASE_HEIGHT);
       pop();
@@ -313,15 +462,30 @@ class Level {
       const btnSize = 30;
       const btnX = bookLeft + bookWidth - btnSize / 2;
       const btnY = bookTop + btnSize / 2;
+      // Compute adjusted mouse coords for hover detection (scaled canvas)
+      const {
+        scaleFactor: _sf,
+        offsetX: _ox,
+        offsetY: _oy,
+      } = getScaleAndOffset();
+      const adjustedMX_book = (mouseX - _ox) / _sf;
+      const adjustedMY_book = (mouseY - _oy) / _sf;
+
+      const isCloseBtnHovered =
+        adjustedMX_book > btnX - btnSize / 2 &&
+        adjustedMX_book < btnX + btnSize / 2 &&
+        adjustedMY_book > btnY - btnSize / 2 &&
+        adjustedMY_book < btnY + btnSize / 2;
+
       push();
       rectMode(CENTER);
-      fill("#D00000");
+      fill(isCloseBtnHovered ? "#E83030" : "#D00000");
       noStroke();
       rect(btnX, btnY, btnSize, btnSize, 5);
       fill("#FFF4E5");
       textAlign(CENTER, CENTER);
-      textSize(16);
-      text("X", btnX, btnY);
+      textSize(18);
+      text("×", btnX, btnY - 1);
       pop();
 
       return;
@@ -330,13 +494,72 @@ class Level {
     // Draw closed book
     image(this.assets.recipeBookClosed, r.x, r.y, r.w, rHeight);
 
-    // ---- Bottles ----
-    this.bottles.forEach((b) => {
-      if (b.isMoving) {
-        const speed = b.isCrystal ? (b.progress < 0.6 ? 0.012 : 0.008) : 0.02;
-        b.progress += speed;
+    // ---- Bottles (Vials) ----
+    this.vials.forEach((vial) => {
+      // Update held bottle position to follow mouse in real-time
+      if (vial.isHeld && !vial.isMoving) {
+        const { scaleFactor, offsetX, offsetY } = getScaleAndOffset();
+        const mx = (mouseX - offsetX) / scaleFactor;
+        const my = (mouseY - offsetY) / scaleFactor;
+        vial.x = mx;
+        vial.y = my;
 
-        if (b.isCrystal) {
+        // Check if held bottle is inside the (asymmetric) drop zone — auto-trigger pour
+        const dx = vial.x - this.dropZone.x;
+        const dy = vial.y - this.dropZone.y;
+        const rxTop =
+          this.dropZone.rxTop || this.dropZone.rx || this.dropZone.r || 0;
+        const rxBottom =
+          this.dropZone.rxBottom || this.dropZone.rx || this.dropZone.r || 0;
+        const ry = this.dropZone.ry || this.dropZone.r || 0;
+        const dzTop =
+          this.dropZone.top !== undefined
+            ? this.dropZone.top
+            : this.dropZone.y - ry;
+        const dzBottom =
+          this.dropZone.bottom !== undefined
+            ? this.dropZone.bottom
+            : this.dropZone.y + ry;
+
+        // Use the bottom (orange) ellipse as the authoritative hit radius,
+        // slightly narrowed so the active zone is a bit smaller than the visual orange ring.
+        const effectiveRx =
+          this.dropZone.actualRx ||
+          rxBottom ||
+          this.dropZone.rx ||
+          this.dropZone.r ||
+          0;
+
+        const insideEllipse =
+          effectiveRx > 0 &&
+          ry > 0 &&
+          (dx * dx) / (effectiveRx * effectiveRx) + (dy * dy) / (ry * ry) <= 1;
+
+        if (insideEllipse) {
+          // Auto-drop: bottle pours in place, then returns to shelf
+          vial.droppedFromHeld = true;
+          vial.pourX = vial.x;
+          vial.pourY = vial.y;
+          vial.isMoving = true;
+          vial.isHeld = false;
+          // keep the picked-up scale while pouring
+          vial.targetScale = 1.15;
+          vial.progress = 0;
+        }
+      }
+
+      // Smooth scale transition for pick-up/drop effect
+      vial.scale = lerp(vial.scale, vial.targetScale, 0.18);
+
+      if (vial.isMoving) {
+        const speed = vial.isCrystal
+          ? vial.progress < 0.6
+            ? 0.012
+            : 0.008
+          : 0.02;
+        vial.progress += speed;
+
+        if (vial.isCrystal) {
           const targetX = layout.cauldron.x;
           const cauldronHeight =
             (this.assets.cauldronImg.height / this.assets.cauldronImg.width) *
@@ -344,86 +567,121 @@ class Level {
           const pauseY = layout.cauldron.y - cauldronHeight / 2 - 90;
           const finalY = layout.cauldron.y + cauldronHeight / 4;
 
-          if (b.progress < 0.6) {
-            const t = b.progress / 0.6;
-            b.x = lerp(b.startX, targetX, t);
-            b.y = lerp(b.startY, pauseY, t);
-          } else if (b.progress < 1) {
-            const t = (b.progress - 0.6) / 0.4;
-            b.x = targetX;
-            b.y = lerp(pauseY, finalY, t);
+          if (vial.progress < 0.6) {
+            const t = vial.progress / 0.6;
+            vial.x = lerp(vial.startX, targetX, t);
+            vial.y = lerp(vial.startY, pauseY, t);
+          } else if (vial.progress < 1) {
+            const t = (vial.progress - 0.6) / 0.4;
+            vial.x = targetX;
+            vial.y = lerp(pauseY, finalY, t);
           } else {
-            b.isMoving = false;
-            b.isSelected = false;
-            b.progress = 0;
-            b.x = targetX;
-            b.y = finalY;
-            b.used = true;
+            vial.isMoving = false;
+            vial.isSelected = false;
+            vial.progress = 0;
+            vial.x = targetX;
+            vial.y = finalY;
+            vial.used = true;
             this.crystalAdded = true;
 
             this.checkSequence();
           }
         } else {
-          const targetX = layout.cauldron.x - 20;
-          const targetY = layout.cauldron.y - 160;
-
-          if (b.progress < 1) {
-            b.x = lerp(b.startX, targetX, b.progress);
-            b.y = lerp(b.startY, targetY, b.progress);
-          } else if (b.progress < 1.5) {
-            b.x = targetX;
-            b.y = targetY;
-            if (!this.addedIngredients.includes(b.img)) {
-              this.addedIngredients.push(b.img);
-              console.log("Added ingredient:", b.img);
+          // Regular bottle animation
+          if (vial.droppedFromHeld) {
+            // New flow: pour in place, then return to shelf
+            if (vial.progress < 1.5) {
+              // Pouring phase (tilting happens during this)
+              vial.x = vial.pourX;
+              vial.y = vial.pourY;
+              if (!this.addedIngredients.includes(vial.img)) {
+                this.addedIngredients.push(vial.img);
+                console.log("Added ingredient:", vial.img);
+              }
+            } else if (vial.progress < 2.5) {
+              // Return to shelf
+              const back = vial.progress - 1.5;
+              vial.x = lerp(vial.pourX, vial.startX, back);
+              vial.y = lerp(vial.pourY, vial.startY, back);
+            } else {
+              // Animation complete
+              vial.isMoving = false;
+              vial.isSelected = false;
+              vial.progress = 0;
+              vial.x = vial.startX;
+              vial.y = vial.startY;
+              // restore normal scale and clear dropped flag
+              vial.targetScale = 1.0;
+              vial.droppedFromHeld = false;
             }
-          } else if (b.progress < 2.5) {
-            const back = b.progress - 1.5;
-            b.x = lerp(targetX, b.startX, back);
-            b.y = lerp(targetY, b.startY, back);
           } else {
-            b.isMoving = false;
-            b.isSelected = false;
-            b.progress = 0;
-            b.x = b.startX;
-            b.y = b.startY;
+            // Original flow: move to cauldron, pour, return to shelf
+            const targetX = layout.cauldron.x - 20;
+            const targetY = layout.cauldron.y - 160;
+
+            if (vial.progress < 1) {
+              vial.x = lerp(vial.startX, targetX, vial.progress);
+              vial.y = lerp(vial.startY, targetY, vial.progress);
+            } else if (vial.progress < 1.5) {
+              vial.x = targetX;
+              vial.y = targetY;
+              if (!this.addedIngredients.includes(vial.img)) {
+                this.addedIngredients.push(vial.img);
+                console.log("Added ingredient:", vial.img);
+              }
+            } else if (vial.progress < 2.5) {
+              const back = vial.progress - 1.5;
+              vial.x = lerp(targetX, vial.startX, back);
+              vial.y = lerp(targetY, vial.startY, back);
+            } else {
+              vial.isMoving = false;
+              vial.isSelected = false;
+              vial.progress = 0;
+              vial.x = vial.startX;
+              vial.y = vial.startY;
+            }
           }
         }
       }
 
-      // ---- Draw bottle ----
+      // ---- Draw vial ----
 
       // Skip crystal during drop phase — already drawn behind cauldron above
-      if (b.isCrystal && !b.used && b.isMoving && b.progress >= 0.6) return;
+      if (vial.isCrystal && !vial.used && vial.isMoving && vial.progress >= 0.6)
+        return;
 
       // Don't draw crystal once it's fully inside the cauldron
-      if (b.isCrystal && b.used) return;
-
-      const bottleWidth = b.isCrystal
-        ? layout.crystal.w
-        : layout.shelf.bottleWidth;
-      const bottleHeight = (b.img.height / b.img.width) * bottleWidth;
+      if (vial.isCrystal && vial.used) return;
 
       push();
-      translate(b.x, b.y);
+      translate(vial.x, vial.y);
+      scale(vial.scale);
 
       let angle = 0;
-      if (!b.isCrystal && b.isMoving && b.progress >= 0.5 && b.progress < 2) {
-        angle = PI / 2.5;
+      if (!vial.isCrystal && vial.isMoving) {
+        const baseTilt = PI / 2.5;
+        const isRightSide = this.dropZone ? vial.x > this.dropZone.x : false;
+        const tilt = isRightSide ? -baseTilt : baseTilt;
+
+        if (vial.droppedFromHeld && vial.progress < 1.5) {
+          // Tilt during pour phase (tilt direction depends on side of drop zone)
+          angle = tilt;
+        } else if (
+          !vial.droppedFromHeld &&
+          vial.progress >= 0.5 &&
+          vial.progress < 2
+        ) {
+          // Original tilt during move + pour + return (after moving to cauldron)
+          angle = tilt;
+        }
       }
 
       rotate(angle);
 
-      if (b.isSelected) {
-        noFill();
-        stroke(255);
-        strokeWeight(2);
-        rectMode(CENTER);
-        rect(0, 0, bottleWidth + 10, bottleHeight + 10, 8);
-      }
+      // selection visual removed per UI update
 
       noStroke();
-      image(b.img, 0, 0, bottleWidth, bottleHeight);
+      image(vial.img, 0, 0, vial.width, vial.height);
       pop();
     });
 
@@ -443,9 +701,7 @@ class Level {
       (this.assets.envelopeImg.height / this.assets.envelopeImg.width) * env.w;
 
     // Check if mouse is hovering over envelope
-    const scaleFactor = min(width / BASE_WIDTH, height / BASE_HEIGHT);
-    const offsetX = (width - BASE_WIDTH * scaleFactor) / 2;
-    const offsetY = (height - BASE_HEIGHT * scaleFactor) / 2;
+    const { scaleFactor, offsetX, offsetY } = getScaleAndOffset();
     const adjustedMX = (mouseX - offsetX) / scaleFactor;
     const adjustedMY = (mouseY - offsetY) / scaleFactor;
     const isEnvHovered =
@@ -718,21 +974,18 @@ class Level {
   }
 
   selectBottle(mx, my) {
-    this.bottles.forEach((b) => {
-      const w = layout.shelf.bottleWidth;
-      const h = (b.img.height / b.img.width) * w;
-
+    this.vials.forEach((vial) => {
       if (
-        !b.used &&
-        mx > b.x - w / 2 &&
-        mx < b.x + w / 2 &&
-        my > b.y - h / 2 &&
-        my < b.y + h / 2
+        !vial.used &&
+        mx > vial.x - vial.width / 2 &&
+        mx < vial.x + vial.width / 2 &&
+        my > vial.y - vial.height / 2 &&
+        my < vial.y + vial.height / 2
       ) {
-        this.selectedBottle = b;
-        b.isSelected = true;
+        this.selectedBottle = vial;
+        vial.isSelected = true;
       } else {
-        b.isSelected = false;
+        vial.isSelected = false;
       }
     });
   }
@@ -756,9 +1009,7 @@ function drawLevel() {
 
   if (!levelInstance) return;
 
-  const scaleFactor = min(width / BASE_WIDTH, height / BASE_HEIGHT);
-  const offsetX = (width - BASE_WIDTH * scaleFactor) / 2;
-  const offsetY = (height - BASE_HEIGHT * scaleFactor) / 2;
+  const { scaleFactor, offsetX, offsetY } = getScaleAndOffset();
 
   push();
   translate(offsetX, offsetY);
@@ -770,30 +1021,41 @@ function drawLevel() {
 function levelMousePressed() {
   if (!levelInstance) return;
 
-  const scaleFactor = min(width / BASE_WIDTH, height / BASE_HEIGHT);
-  const offsetX = (width - BASE_WIDTH * scaleFactor) / 2;
-  const offsetY = (height - BASE_HEIGHT * scaleFactor) / 2;
-
+  const { scaleFactor, offsetX, offsetY } = getScaleAndOffset();
   const adjustedX = (mouseX - offsetX) / scaleFactor;
   const adjustedY = (mouseY - offsetY) / scaleFactor;
 
-  levelInstance.selectBottle(adjustedX, adjustedY);
+  // Check if a bottle is currently being held
+  const heldVial = levelInstance.vials.find((v) => v.isHeld);
 
-  // ---- CAULDRON CLICK ----
-  const c = layout.cauldron;
-  const cWidth = c.w;
-  const cHeight =
-    (levelInstance.assets.cauldronImg.height /
-      levelInstance.assets.cauldronImg.width) *
-    c.w;
-  if (
-    adjustedX > c.x - cWidth / 2 &&
-    adjustedX < c.x + cWidth / 2 &&
-    adjustedY > c.y - cHeight / 2 &&
-    adjustedY < c.y + cHeight / 2
-  ) {
-    levelInstance.pourSelectedBottle();
+  if (heldVial) {
+    // Click while holding = cancel and return to shelf
+    heldVial.isHeld = false;
+    heldVial.isSelected = false;
+    heldVial.x = heldVial.startX;
+    heldVial.y = heldVial.startY;
+    heldVial.scale = 1.0;
+    heldVial.targetScale = 1.0;
+    return;
   }
+
+  // No bottle held — try to pick one up by clicking on it
+  levelInstance.vials.forEach((vial) => {
+    if (
+      !vial.used &&
+      !vial.isMoving &&
+      adjustedX > vial.x - vial.width / 2 &&
+      adjustedX < vial.x + vial.width / 2 &&
+      adjustedY > vial.y - vial.height / 2 &&
+      adjustedY < vial.y + vial.height / 2
+    ) {
+      vial.isSelected = true;
+      vial.isHeld = true;
+      vial.targetScale = 1.15;
+    } else {
+      vial.isSelected = false;
+    }
+  });
 
   // ---- Order Overlay Close Button ----
   if (levelInstance.isOrderOpen) {

@@ -59,8 +59,8 @@ function preload() {
   levelBg = loadImage("assets/background/blue-lvl.png");
   orderSheet = loadImage("assets/order/blank-order-sheet.png");
   blankOrderSheet2 = loadImage("assets/order/blank-order-sheet-2.png");
-  cauldronImg = loadImage("assets/cauldron/cauldron-1.svg");
-  recipeBookClosed = loadImage("assets/recipe/closed-recipe-book.svg");
+  cauldronImg = loadImage("assets/cauldron/cauldron-default-state.png");
+  recipeBookClosed = loadImage("assets/recipe/recipe-book-default-state.png");
   recipeBookOpen = loadImage("assets/recipe/open-recipe-book.svg");
 
   bottleGreen = loadImage("assets/ingredient-bottles/lvl-1-easy-green.svg");
@@ -98,6 +98,7 @@ function preload() {
 // ------------------------------
 // This is where you usually set canvas size and initial settings.
 function setup() {
+  pixelDensity(1);
   createCanvas(windowWidth, windowHeight);
   levelInstance = new Level({
     cauldronImg,
@@ -114,6 +115,9 @@ function setup() {
     crystalImg,
     bowlImg,
     envelopeImg,
+    greenSymbol,
+    blueSymbol,
+    orangeSymbol,
   });
 }
 
