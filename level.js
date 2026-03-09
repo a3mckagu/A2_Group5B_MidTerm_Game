@@ -10,7 +10,7 @@ const layout = {
   cauldron: { x: 576, y: 480, w: 300 },
   recipeBook: { x: 190, y: 530, w: 100 },
   crystal: { x: 900, y: 455, w: 36 },
-  orderSheet: { x: 970, y: 150, w: 150 },
+  orderSheet: { x: 940, y: 210, w: 150 },
   bowl: { x: 900, y: 500, w: 140 },
   envelope: { x: 1100, y: 50, w: 50 },
 
@@ -81,6 +81,7 @@ class Level {
     this.isOrderOpen = false;
     this.hasUnreadOrder = true;
     this.envelopeScale = 1;
+    this.orderStarted = false;
 
     // --- SEQUENCE TRACKING ---
     this.addedIngredients = [];
@@ -109,6 +110,90 @@ class Level {
     imageMode(CORNER);
     image(this.assets.levelBg, 0, 0, BASE_WIDTH, BASE_HEIGHT);
     imageMode(CENTER);
+
+    // ---- ORDER SHEET (shown after START ORDER is clicked) ----
+    if (this.orderStarted) {
+      const o = layout.orderSheet;
+      const sheetWidth = 290;
+      const sheetHeight =
+        (this.assets.blankOrderSheet2.height /
+          this.assets.blankOrderSheet2.width) *
+        sheetWidth;
+      image(this.assets.blankOrderSheet2, o.x, o.y, sheetWidth, sheetHeight);
+
+      // Sheet content with padding
+      const sheetLeft = o.x - sheetWidth / 2;
+      const sheetTop = o.y - sheetHeight / 2;
+      const padding = 30;
+
+      // "Beginner's Luck" heading
+      push();
+      textAlign(LEFT, TOP);
+      textFont("Manufacturing Consent");
+      textSize(32);
+      fill("#2D0900");
+      text("Beginner's Luck", sheetLeft + padding, sheetTop + padding + 10);
+      pop();
+
+      // "From: Lord Alistair"
+      push();
+      textAlign(LEFT, TOP);
+      textFont("IM Fell English");
+      textStyle(ITALIC);
+      textSize(18);
+      fill("#6E6E6E");
+      text("From: Lord Alistair", sheetLeft + padding, sheetTop + padding + 50);
+      pop();
+
+      // Patience section
+      const barWidth = sheetWidth - padding * 2;
+      const barHeight = 15;
+      const barX = sheetLeft + padding;
+      const barY = sheetTop + padding + 105;
+
+      // "CUSTOMER PATIENCE" label
+      push();
+      textAlign(LEFT, BOTTOM);
+      textFont("VT323");
+      textSize(15);
+      fill("#6E6E6E");
+      text("CUSTOMER PATIENCE", barX, barY - 4);
+      pop();
+
+      // Bar background
+      push();
+      rectMode(CORNER);
+      fill("#CCCCCC");
+      noStroke();
+      rect(barX, barY, barWidth, barHeight);
+      pop();
+
+      // Gradient fill (red → yellow → green)
+      push();
+      noStroke();
+      for (let i = 0; i < barWidth; i++) {
+        const t = i / barWidth;
+        let c;
+        if (t < 0.5) {
+          c = lerpColor(color("#D00000"), color("#FFD700"), t * 2);
+        } else {
+          c = lerpColor(color("#FFD700"), color("#228B22"), (t - 0.5) * 2);
+        }
+        fill(c);
+        rect(barX + i, barY, 1, barHeight);
+      }
+      pop();
+
+      // Segment lines
+      push();
+      stroke("#6E6E6E");
+      strokeWeight(1);
+      for (let i = 1; i < 4; i++) {
+        const lineX = barX + (barWidth / 4) * i;
+        line(lineX, barY + 1, lineX, barY + barHeight - 1);
+      }
+      pop();
+    }
 
     // ---- BOWL ----
     const b = layout.bowl;
@@ -385,13 +470,15 @@ class Level {
       const badgeX = env.x + env.w / 2 - 5;
       const badgeY = env.y - envHeight / 2 + 5;
 
-      // Pulsing ring effect behind the badge
-      const pulse = (sin(frameCount * 0.05) + 1) / 2; // 0 to 1
-      const ringRadius = 14 + pulse * 10; // 14 to 24
-      const ringAlpha = 150 * (1 - pulse); // 150 to 0
-      fill(208, 0, 0, ringAlpha);
-      noStroke();
-      ellipse(badgeX, badgeY, ringRadius * 2, ringRadius * 2);
+      // Pulsing ring effect behind the badge (only when panel is closed)
+      if (!this.isOrderOpen) {
+        const pulse = (sin(frameCount * 0.05) + 1) / 2; // 0 to 1
+        const ringRadius = 14 + pulse * 10; // 14 to 24
+        const ringAlpha = 150 * (1 - pulse); // 150 to 0
+        fill(208, 0, 0, ringAlpha);
+        noStroke();
+        ellipse(badgeX, badgeY, ringRadius * 2, ringRadius * 2);
+      }
 
       // Solid badge circle
       fill("#D00000");
@@ -424,7 +511,7 @@ class Level {
 
       // Draw notification panel on right side under envelope
       const panelWidth = 350;
-      const panelHeight = 290;
+      const panelHeight = 296;
       const panelRight = env.x + env.w / 2;
       const panelTop = env.y + envHeight / 2 + 15;
       const panelLeft = panelRight - panelWidth;
@@ -453,119 +540,136 @@ class Level {
       line(panelLeft, panelTop + 50, panelLeft + panelWidth, panelTop + 50);
       pop();
 
-      // Inner order card
+      // Inner order area
       const cardMargin = 15;
       const cardLeft = panelLeft + cardMargin;
       const cardTop = panelTop + 60;
       const cardWidth = panelWidth - cardMargin * 2;
       const cardHeight = panelHeight - 75;
 
-      push();
-      rectMode(CORNER);
-      fill("#F5E6D1");
-      noStroke();
-      rect(cardLeft, cardTop, cardWidth, cardHeight, 8);
-      pop();
+      if (!this.orderStarted) {
+        // Show order card when order is active
+        push();
+        rectMode(CORNER);
+        fill("#F5E6D1");
+        noStroke();
+        rect(cardLeft, cardTop, cardWidth, cardHeight, 8);
+        pop();
 
-      // Card heading - "Beginner's Luck"
-      push();
-      textAlign(LEFT, TOP);
-      textFont("Manufacturing Consent");
-      textSize(36);
-      fill("#2D0900");
-      text("Beginner's Luck", cardLeft + 20, cardTop + 20);
-      pop();
+        // Card heading - "Beginner's Luck"
+        push();
+        textAlign(LEFT, TOP);
+        textFont("Manufacturing Consent");
+        textSize(36);
+        fill("#2D0900");
+        text("Beginner's Luck", cardLeft + 20, cardTop + 20);
+        pop();
 
-      // "From: Lord Alistair"
-      push();
-      textAlign(LEFT, TOP);
-      textFont("IM Fell English");
-      textStyle(ITALIC);
-      textSize(20);
-      fill("#6E6E6E");
-      text("From: Lord Alistair", cardLeft + 20, cardTop + 65);
-      pop();
+        // "From: Lord Alistair"
+        push();
+        textAlign(LEFT, TOP);
+        textFont("IM Fell English");
+        textStyle(ITALIC);
+        textSize(20);
+        fill("#6E6E6E");
+        text("From: Lord Alistair", cardLeft + 20, cardTop + 65);
+        pop();
 
-      // Patience bar (above START ORDER button)
-      const startBtnMargin = 20;
-      const startBtnWidth = cardWidth - startBtnMargin * 2;
-      const barHeight = 16;
-      const barX = cardLeft + startBtnMargin;
-      const barY = cardTop + cardHeight - 36 - 15 - barHeight - 18; // 18px gap above button
+        // Patience bar (above START ORDER button)
+        const startBtnMargin = 20;
+        const startBtnWidth = cardWidth - startBtnMargin * 2;
+        const barHeight = 16;
+        const barX = cardLeft + startBtnMargin;
+        const barY = cardTop + cardHeight - 42 - 15 - barHeight - 18; // 18px gap above button
 
-      // "CUSTOMER PATIENCE" label
-      push();
-      textAlign(LEFT, BOTTOM);
-      textFont("VT323");
-      textSize(16);
-      fill("#6E6E6E");
-      text("CUSTOMER PATIENCE", barX, barY - 4);
-      pop();
+        // "CUSTOMER PATIENCE" label
+        push();
+        textAlign(LEFT, BOTTOM);
+        textFont("VT323");
+        textSize(16);
+        fill("#6E6E6E");
+        text("CUSTOMER PATIENCE", barX, barY - 4);
+        pop();
 
-      // Bar background (light grey - depleted portion)
-      push();
-      rectMode(CORNER);
-      fill("#CCCCCC");
-      noStroke();
-      rect(barX, barY, startBtnWidth, barHeight);
-      pop();
+        // Bar background (light grey - depleted portion)
+        push();
+        rectMode(CORNER);
+        fill("#CCCCCC");
+        noStroke();
+        rect(barX, barY, startBtnWidth, barHeight);
+        pop();
 
-      // Gradient fill (red → yellow → green, left to right)
-      push();
-      noStroke();
-      const gradientSteps = startBtnWidth;
-      for (let i = 0; i < gradientSteps; i++) {
-        const t = i / gradientSteps;
-        let c;
-        if (t < 0.5) {
-          // Red to yellow
-          c = lerpColor(color("#D00000"), color("#FFD700"), t * 2);
-        } else {
-          // Yellow to green
-          c = lerpColor(color("#FFD700"), color("#228B22"), (t - 0.5) * 2);
+        // Gradient fill (red → yellow → green, left to right)
+        push();
+        noStroke();
+        const gradientSteps = startBtnWidth;
+        for (let i = 0; i < gradientSteps; i++) {
+          const t = i / gradientSteps;
+          let c;
+          if (t < 0.5) {
+            // Red to yellow
+            c = lerpColor(color("#D00000"), color("#FFD700"), t * 2);
+          } else {
+            // Yellow to green
+            c = lerpColor(color("#FFD700"), color("#228B22"), (t - 0.5) * 2);
+          }
+          fill(c);
+          rect(barX + i, barY, 1, barHeight);
         }
-        fill(c);
-        rect(barX + i, barY, 1, barHeight);
+        pop();
+
+        // Increment lines (2 minutes = 120 seconds, lines every 30 seconds = 4 segments)
+        push();
+        stroke("#6E6E6E");
+        strokeWeight(1);
+        for (let i = 1; i < 4; i++) {
+          const lineX = barX + (startBtnWidth / 4) * i;
+          line(lineX, barY + 1, lineX, barY + barHeight - 1);
+        }
+        pop();
+
+        // "Start Order" button
+        const startBtnHeight = 42;
+        const startBtnX = cardLeft + startBtnMargin;
+        const startBtnY = cardTop + cardHeight - startBtnHeight - 15;
+
+        // Check if hovering over START ORDER button
+        const isStartBtnHovered =
+          adjustedMX > startBtnX &&
+          adjustedMX < startBtnX + startBtnWidth &&
+          adjustedMY > startBtnY &&
+          adjustedMY < startBtnY + startBtnHeight;
+
+        push();
+        rectMode(CORNER);
+        fill(isStartBtnHovered ? "#4A2010" : "#2E1006");
+        noStroke();
+        rect(startBtnX, startBtnY, startBtnWidth, startBtnHeight, 8);
+        textAlign(CENTER, CENTER);
+        textFont("VT323");
+        textSize(24);
+        fill("#FFF4E5");
+        text(
+          "START ORDER",
+          startBtnX + startBtnWidth / 2,
+          startBtnY + startBtnHeight / 2,
+        );
+        pop();
+      } else {
+        // No active order — show centered message
+        push();
+        textAlign(CENTER, CENTER);
+        textFont("IM Fell English");
+        textStyle(ITALIC);
+        textSize(24);
+        fill("#FFF4E5");
+        text(
+          "No new orders",
+          panelLeft + panelWidth / 2,
+          panelTop + panelHeight / 2,
+        );
+        pop();
       }
-      pop();
-
-      // Increment lines (2 minutes = 120 seconds, lines every 30 seconds = 4 segments)
-      push();
-      stroke("#6E6E6E");
-      strokeWeight(1);
-      for (let i = 1; i < 4; i++) {
-        const lineX = barX + (startBtnWidth / 4) * i;
-        line(lineX, barY + 1, lineX, barY + barHeight - 1);
-      }
-      pop();
-
-      // "Start Order" button
-      const startBtnHeight = 36;
-      const startBtnX = cardLeft + startBtnMargin;
-      const startBtnY = cardTop + cardHeight - startBtnHeight - 15;
-
-      // Check if hovering over START ORDER button
-      const isStartBtnHovered =
-        adjustedMX > startBtnX &&
-        adjustedMX < startBtnX + startBtnWidth &&
-        adjustedMY > startBtnY &&
-        adjustedMY < startBtnY + startBtnHeight;
-
-      push();
-      rectMode(CORNER);
-      fill(isStartBtnHovered ? "#4A2010" : "#2E1006");
-      noStroke();
-      rect(startBtnX, startBtnY, startBtnWidth, startBtnHeight, 8);
-      textAlign(CENTER, CENTER);
-      textFont("VT323");
-      textSize(24);
-      fill("#FFF4E5");
-      text(
-        "START ORDER",
-        startBtnX + startBtnWidth / 2,
-        startBtnY + startBtnHeight / 2,
-      );
-      pop();
 
       // Close button
       const btnSize = 24;
@@ -587,8 +691,27 @@ class Level {
       fill("#FFF4E5");
       textAlign(CENTER, CENTER);
       textSize(18);
-      text("×", btnX, btnY);
+      text("×", btnX, btnY - 1);
       pop();
+
+      // Redraw notification badge on top of overlay (without pulsing animation)
+      if (this.hasUnreadOrder) {
+        push();
+        const badgeX = env.x + env.w / 2 - 5;
+        const badgeY = env.y - envHeight / 2 + 5;
+
+        // Solid badge circle
+        fill("#D00000");
+        noStroke();
+        ellipse(badgeX, badgeY, 26, 26);
+        fill(255);
+        textAlign(CENTER, CENTER);
+        textFont("VT323");
+        textSize(18);
+        textStyle(BOLD);
+        text("1", badgeX, badgeY);
+        pop();
+      }
 
       return;
     }
@@ -682,9 +805,36 @@ function levelMousePressed() {
 
     // Panel coordinates matching draw code
     const panelWidth = 350;
+    const panelHeight = 296;
     const panelRight = env.x + env.w / 2;
     const panelTop = env.y + envHeight / 2 + 15;
     const panelLeft = panelRight - panelWidth;
+
+    // Card coordinates matching draw code
+    const cardMargin = 15;
+    const cardLeft = panelLeft + cardMargin;
+    const cardTop = panelTop + 60;
+    const cardWidth = panelWidth - cardMargin * 2;
+    const cardHeight = panelHeight - 75;
+
+    // START ORDER button coordinates
+    const startBtnMargin = 20;
+    const startBtnWidth = cardWidth - startBtnMargin * 2;
+    const startBtnHeight = 42;
+    const startBtnX = cardLeft + startBtnMargin;
+    const startBtnY = cardTop + cardHeight - startBtnHeight - 15;
+
+    if (
+      adjustedX > startBtnX &&
+      adjustedX < startBtnX + startBtnWidth &&
+      adjustedY > startBtnY &&
+      adjustedY < startBtnY + startBtnHeight
+    ) {
+      levelInstance.orderStarted = true;
+      levelInstance.hasUnreadOrder = false;
+      levelInstance.isOrderOpen = false;
+      return;
+    }
 
     const btnSize = 24;
     const btnX = panelLeft + panelWidth - btnSize / 2 - 8;
@@ -727,7 +877,6 @@ function levelMousePressed() {
     adjustedY < env.y + envHeight / 2
   ) {
     levelInstance.isOrderOpen = true;
-    levelInstance.hasUnreadOrder = false;
     return;
   }
 

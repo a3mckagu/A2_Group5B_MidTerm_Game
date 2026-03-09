@@ -26,7 +26,12 @@ let level;
 let levelInstance;
 
 let potionaryLogo, potionaryLogoDetail, startBg, levelMenu;
-let levelBg, orderSheet, cauldronImg, recipeBookClosed, recipeBookOpen;
+let levelBg,
+  orderSheet,
+  blankOrderSheet2,
+  cauldronImg,
+  recipeBookClosed,
+  recipeBookOpen;
 let bottleGreen, bottleRed, bottleBlue, bottleOrange, bottlePink;
 let crystalImg, bowlImg, envelopeImg;
 let greenSymbol, blueSymbol, orangeSymbol;
@@ -53,6 +58,7 @@ function preload() {
   // Level 1 assets
   levelBg = loadImage("assets/background/blue-lvl.png");
   orderSheet = loadImage("assets/order/blank-order-sheet.png");
+  blankOrderSheet2 = loadImage("assets/order/blank-order-sheet-2.png");
   cauldronImg = loadImage("assets/cauldron/cauldron-1.svg");
   recipeBookClosed = loadImage("assets/recipe/closed-recipe-book.svg");
   recipeBookOpen = loadImage("assets/recipe/open-recipe-book.svg");
@@ -99,6 +105,7 @@ function setup() {
     recipeBookOpen,
     levelBg,
     orderSheet,
+    blankOrderSheet2,
     bottleGreen,
     bottleRed,
     bottleBlue,
