@@ -717,7 +717,7 @@ class Level {
 
       if (isPouring && this.dropZone) {
         push();
-        // Compute angle for tilt direction
+        // Compute tilt direction
         const baseTilt = PI / 3.5;
         const isRightSide = vial.x > this.dropZone.x;
         const tiltDir = isRightSide ? -1 : 1;
@@ -757,61 +757,117 @@ class Level {
           // Nudge slightly towards the center-of-hitbox depending on pour side
           const nudge = 8;
           if (streamStartX < this.dropZone.x) {
-            // pouring from left: nudge right
             streamEndX = min(streamEndX + nudge, right - 2);
           } else {
-            // pouring from right: nudge left
             streamEndX = max(streamEndX - nudge, left + 2);
           }
 
-          // Stream colour based on vial
-          const colourMap = {
-            green: color(72, 180, 72, 200),
-            red: color(200, 50, 50, 200),
-            blue: color(60, 120, 220, 200),
-            orange: color(230, 140, 40, 200),
-            pink: color(220, 100, 160, 200),
+          // 4 shade variants per vial color: lightest → darkest (back to front)
+          const shadeMap = {
+            green: [
+              color(150, 230, 150, 100),
+              color(100, 210, 100, 140),
+              color(72, 180, 72, 180),
+              color(40, 130, 40, 217),
+            ],
+            red: [
+              color(240, 150, 150, 100),
+              color(230, 100, 100, 140),
+              color(200, 50, 50, 180),
+              color(150, 20, 20, 217),
+            ],
+            blue: [
+              color(150, 200, 240, 100),
+              color(100, 170, 235, 140),
+              color(60, 120, 220, 180),
+              color(30, 80, 180, 217),
+            ],
+            orange: [
+              color(255, 210, 130, 100),
+              color(245, 180, 80, 140),
+              color(230, 140, 40, 180),
+              color(200, 100, 10, 217),
+            ],
+            pink: [
+              color(255, 180, 210, 100),
+              color(240, 150, 190, 140),
+              color(220, 100, 160, 180),
+              color(180, 60, 120, 217),
+            ],
           };
-          const streamColour = colourMap[vial.colour] || color(150, 150, 150, 200);
+          const shades = shadeMap[vial.colour] || [
+            color(200, 200, 200, 100),
+            color(180, 180, 180, 140),
+            color(150, 150, 150, 180),
+            color(120, 120, 120, 217),
+          ];
 
-          // Animated wave offset for natural flow
-          const waveSpeed = 0.15;
-          const waveAmp = 4;
-          const timeOffset = frameCount * waveSpeed;
+          // Ribbon half-widths: back to front (widest to narrowest)
+          const ribbonHalfWidths = [14, 10, 7, 4];
+          // Horizontal offsets for control points per layer (different S-curves)
+          const cpHOffsets = [8, 3, -3, -8];
+          // Animation speeds and phases per layer for flowing motion
+          const speeds = [0.08, 0.11, 0.14, 0.17];
+          const phaseOffsets = [0, PI / 4, PI / 2, (3 * PI) / 4];
+          const waveAmps = [6, 5, 4, 3];
+          // Number of sample points per ribbon edge
+          const N = 16;
 
-          // Draw multiple bezier curves for a thicker, more organic stream
-          noFill();
-          strokeWeight(5);
-          stroke(streamColour);
-
-          // Control points for bezier — creates a gentle arc
-          const cp1x = streamStartX + tiltDir * 15 + sin(timeOffset) * waveAmp;
-          const cp1y = lerp(streamStartY, streamEndY, 0.3);
-          const cp2x = streamEndX + sin(timeOffset + 1.5) * waveAmp * 0.5;
-          const cp2y = lerp(streamStartY, streamEndY, 0.7);
-
-          bezier(
-            streamStartX, streamStartY,
-            cp1x, cp1y,
-            cp2x, cp2y,
-            streamEndX, streamEndY
-          );
-
-          // Draw a thinner highlight for depth
-          strokeWeight(2);
-          stroke(red(streamColour) + 40, green(streamColour) + 40, blue(streamColour) + 40, 150);
-          bezier(
-            streamStartX - tiltDir * 1.5, streamStartY,
-            cp1x - tiltDir * 1, cp1y,
-            cp2x, cp2y,
-            streamEndX, streamEndY
-          );
-
-          // Small splash/drip effect at the end
           noStroke();
-          fill(streamColour);
-          const splashSize = 6 + sin(timeOffset * 2) * 2;
-          ellipse(streamEndX, streamEndY, splashSize, splashSize * 0.6);
+          for (let i = 0; i < 4; i++) {
+            const hw = ribbonHalfWidths[i];
+            const cpOff = cpHOffsets[i];
+            const waveAmp = waveAmps[i];
+            const timeOff = frameCount * speeds[i] + phaseOffsets[i];
+
+            const sx = streamStartX;
+            const sy = streamStartY;
+            const ex = streamEndX;
+            const ey = streamEndY;
+
+            // Center-line bezier control points for this ribbon layer
+            const cp1x = sx + tiltDir * 20 + cpOff + sin(timeOff) * waveAmp;
+            const cp1y = lerp(sy, ey, 0.3);
+            const cp2x = ex + cpOff * 0.5 + sin(timeOff + 1.5) * waveAmp * 0.5;
+            const cp2y = lerp(sy, ey, 0.7);
+
+            // Cache bezier samples (position + normal) for this ribbon layer
+            const samples = [];
+            for (let j = 0; j <= N; j++) {
+              const t = j / N;
+              const mt = 1 - t;
+              const bx = mt*mt*mt*sx + 3*mt*mt*t*cp1x + 3*mt*t*t*cp2x + t*t*t*ex;
+              const by = mt*mt*mt*sy + 3*mt*mt*t*cp1y + 3*mt*t*t*cp2y + t*t*t*ey;
+              // Bezier derivative (tangent) for perpendicular normal
+              const ddx = 3*mt*mt*(cp1x - sx) + 6*mt*t*(cp2x - cp1x) + 3*t*t*(ex - cp2x);
+              const ddy = 3*mt*mt*(cp1y - sy) + 6*mt*t*(cp2y - cp1y) + 3*t*t*(ey - cp2y);
+              const len = sqrt(ddx*ddx + ddy*ddy) || 1;
+              samples.push({
+                bx, by,
+                nx: -ddy / len,
+                ny: ddx / len,
+                wMult: 1 + t * 0.5,   // widen ribbon slightly towards bottom
+              });
+            }
+
+            fill(shades[i]);
+            beginShape();
+            // Left edge: top → bottom, offset along +normal direction
+            for (const s of samples) {
+              vertex(s.bx + s.nx * hw * s.wMult, s.by + s.ny * hw * s.wMult);
+            }
+            // Right edge: bottom → top, offset along -normal direction
+            for (let j = samples.length - 1; j >= 0; j--) {
+              const s = samples[j];
+              vertex(s.bx - s.nx * hw * s.wMult, s.by - s.ny * hw * s.wMult);
+            }
+            endShape(CLOSE);
+          }
+
+          // Small spread effect at the bottom where ribbons widen
+          noStroke();
+          fill(shades[1]);
+          ellipse(streamEndX, streamEndY, ribbonHalfWidths[0] * 3, ribbonHalfWidths[0]);
         }
         pop();
       }
