@@ -33,7 +33,7 @@ let levelBg,
   recipeBookClosed,
   recipeBookOpen;
 let bottleGreen, bottleRed, bottleBlue, bottleOrange, bottlePink;
-let crystalImg, bowlTopImg, bowlImg, envelopeImg;
+let crystalImg, bowlImg, envelopeImg;
 let greenSymbol, blueSymbol, orangeSymbol;
 let mapIcon1, mapIcon2, mapIcon3, mapIcon4;
 
@@ -91,8 +91,8 @@ function preload() {
   bottleOpenYellow = loadImage("assets/vials/open-yellow.svg");
 
   crystalImg = loadImage("assets/crystal/crystal-v2.svg");
-  bowlTopImg = loadImage("assets/crystal/bowl-top.png");
-  bowlImg = loadImage("assets/crystal/bowl-bottom.png");
+  // Use single brown bowl asset instead of split top/bottom pieces
+  bowlImg = loadImage("assets/crystal/brown-bowl.png");
   envelopeImg = loadImage("assets/order/envelope.png");
 
   greenSymbol = loadImage("assets/symbols/green-symbol.svg");
@@ -155,7 +155,6 @@ function setup() {
     bottleOpenTeal,
     bottleOpenYellow,
     crystalImg,
-    bowlTopImg,
     bowlImg,
     envelopeImg,
     greenSymbol,

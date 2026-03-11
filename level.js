@@ -363,7 +363,7 @@ class Level {
       pop();
     }
 
-    // ---- BOWL (unified top + bottom) ----
+    // ---- BOWL (single brown bowl) ----
     const b = layout.bowl;
 
     // Align bottom of bowl with bottom of recipe book
@@ -373,37 +373,30 @@ class Level {
         this.assets.recipeBookClosed.width) *
       rb.w;
 
-    // Calculate heights for both pieces from aspect ratios and shared width
-    const bowlBottomHeight =
+    // Compute single bowl height from aspect ratio and shared width
+    const bowlHeight =
       (this.assets.bowlImg.height / this.assets.bowlImg.width) * b.w;
-    const bowlTopHeight =
-      (this.assets.bowlTopImg.height / this.assets.bowlTopImg.width) * b.w;
 
-    // Compute bottom position (source of truth), then derive top position
-    const desiredBowlY = rb.y + rbHeight / 2 - bowlBottomHeight / 2;
-    // Place the top piece so its bottom edge meets the top edge of the bottom piece.
-    // For CENTER image mode: topCenterY + topHeight/2 = bottomCenterY - bottomHeight/2
-    const bowlTopY = desiredBowlY - (bowlBottomHeight / 2 + bowlTopHeight / 2);
+    // Place the bowl so its bottom aligns with the bottom of the recipe book
+    const desiredBowlY = rb.y + rbHeight / 2 - bowlHeight / 2;
 
-    // Draw bowl-top first (in front order)
-    image(this.assets.bowlTopImg, b.x, bowlTopY, b.w, bowlTopHeight);
+    // Draw the single brown bowl
+    image(this.assets.bowlImg, b.x, desiredBowlY, b.w, bowlHeight);
 
     // Keep crystal positioned relative to the bowl when not moving
     const crystalYOffset = layout.bowl.y - layout.crystal.y; // original offset
     const crystalVial = this.vials.find((v) => v.isCrystal);
     if (crystalVial && !crystalVial.isMoving) {
       crystalVial.x = b.x;
-      // Nudge the crystal slightly downward so it visually sits
-      // a bit lower between the bowl halves.
-      crystalVial.y = desiredBowlY - crystalYOffset + 8;
+      // Place crystal slightly above the bowl center based on original offset
+      // Nudge slightly upward for finer alignment
+      crystalVial.y = desiredBowlY - crystalYOffset + 10;
       crystalVial.startX = crystalVial.x;
       crystalVial.startY = crystalVial.y;
     }
 
-    // ---- CRYSTAL — draw between bowl-top and bowl-bottom during the drop phase ----
+    // ---- CRYSTAL — draw on top of bowl during the drop phase ----
     const crystal = this.bottles.find((b) => b.isCrystal);
-    // Always draw the crystal between the bowl top and bottom when it's
-    // present and not yet used (i.e. not inside the cauldron).
     if (crystal && !crystal.used) {
       const cw = layout.crystal.w;
       const ch = (crystal.img.height / crystal.img.width) * cw;
@@ -413,9 +406,6 @@ class Level {
       image(crystal.img, 0, 0, cw, ch);
       pop();
     }
-
-    // Draw bowl-bottom last (behind crystal)
-    image(this.assets.bowlImg, b.x, desiredBowlY, b.w, bowlBottomHeight);
 
     // ---- CAULDRON ----
     const c = layout.cauldron;
@@ -435,73 +425,48 @@ class Level {
       const ringWidth = c.w * 0.4;
       const ringHeight = cHeight * 0.095; // slightly shallower ellipse
 
-      // Golden ring drawing removed — hit area calculations remain active.
-      // Update drop zone so it covers a vertical span that starts a bit
-      // above the top of the golden ring and ends at the bottom of the ring.
-      // We'll represent the zone as an ellipse (rx, ry) so horizontal hits
-      // near the ring edges work reliably.
-      const dzExtra = 56; // extra pixels above the ring top to include (shorter)
       const ringTop = rimY - ringHeight / 2;
       const ringBottom = rimY + ringHeight / 2;
-      const dzTop = ringTop - dzExtra; // desired top of drop area
-      const dzBottom = ringBottom; // desired bottom of drop area
-      const dzCenterY = (dzTop + dzBottom) / 2;
 
-      // We'll keep the bottom of the active hit area aligned with the ringBottom
-      // and increase its vertical radius so it extends upward more.
-      const hitCenterY = rimY; // reference (we'll set actual dropZone.y after computing actualRy)
+      // Elliptical hitbox centered above the rim. minClearance ensures the
+      // vial is always far enough above the rim for the stream to arc naturally.
+      const minClearance = 30; // minimum px above rim bottom
+      const ellipseHalfH = 40; // vertical radius of the hit ellipse
+      const hitboxYOffset = 24; // move hitbox downward by this many pixels (increased)
+      const ellipseCenterY =
+        ringBottom - minClearance - ellipseHalfH + hitboxYOffset;
+      const ellipseHalfW = (ringWidth / 2) * 1.2; // slightly wider than opening
 
-      // Base horizontal radius (center), and asymmetric top/bottom radii
-      const baseRx = (ringWidth / 2) * 1.15; // horizontal radius (a bit wider than ring)
-      const ry = (dzBottom - dzTop) / 2; // vertical radius to cover top->bottom
+      // Compute previous ellipse bottom (lowest point)
+      const ellipseBottom = ellipseCenterY + ellipseHalfH;
 
-      // Make bottom wider than top so the hit area flares outward near the rim
-      const rxTop = baseRx * 0.9; // slightly narrower near the top
-      const rxBottom = baseRx * 1.35; // wider near the bottom
+      // Create a semicircle hitbox whose diameter (flat edge) sits on the
+      // previous ellipse bottom. Use ellipseHalfW as the semicircle radius
+      // so the semicircle width matches the earlier ellipse width.
+      const semiRx = ellipseHalfW; // keep width
+      const heightMultiplier = 0.7; // reduce height to make a semi-oval
+      const semiRy = semiRx * heightMultiplier;
+      // Place the oval center so its flat diameter (the arc endpoints)
+      // sits exactly at the previous ellipse bottom: centerY = ellipseBottom
+      const semiCenterY = ellipseBottom;
 
       this.dropZone.x = c.x;
-      this.dropZone.rx = baseRx; // keep a central reference
-      this.dropZone.rxTop = rxTop;
-      this.dropZone.rxBottom = rxBottom;
-      this.dropZone.ry = ry;
-      // store explicit vertical bounds for interpolation in hit-tests
-      this.dropZone.top = dzTop;
-      this.dropZone.bottom = dzBottom;
-      // keep r for backward compatibility (max radius)
-      this.dropZone.r = max(baseRx, ry, rxBottom);
-      // Actual hit area: match the golden ring width/height, centered slightly higher
-      // Make the active hit area wider than the gold ring so it's easier to hit
-      const actualRxMultiplier = 1.25; // 25% wider on each side
-      this.dropZone.actualRx = (ringWidth / 2) * actualRxMultiplier; // horizontal radius from ring width
-      // Increase vertical radius so hit area extends upward while keeping bottom fixed
-      const actualRyMultiplier = 2.2; // increase vertical reach (keep bottom fixed)
-      this.dropZone.actualRy = (ringHeight / 2) * actualRyMultiplier;
-      // Position dropZone.y so bottom of the ellipse matches ringBottom
-      this.dropZone.y = ringBottom - this.dropZone.actualRy;
+      this.dropZone.y = semiCenterY; // oval center
+      // store radii for ellipse checks and compatibility
+      this.dropZone.actualRx = semiRx;
+      this.dropZone.actualRy = semiRy;
+      this.dropZone.radiusX = semiRx;
+      this.dropZone.radiusY = semiRy;
+      this.dropZone.rimY = ringBottom;
+      // Store arc center so other code (streams) can reference the exact
+      // visual center of the cauldron rim arc; keeps everything in sync
+      // if the cauldron image or layout changes or when scaling.
+      this.dropZone.arcCenterY = ringBottom - ringHeight / 2;
+      this.dropZone.ringWidth = ringWidth;
+      this.dropZone.ringHeight = ringHeight;
+      this.dropZone.r = max(semiRx, semiRy);
 
-      // Debug: draw the drop-zone hitbox rectangle for tuning
-      push();
-      rectMode(CENTER);
-      noFill();
-      stroke(255, 255, 255, 180);
-      strokeWeight(1.4);
-      rect(
-        this.dropZone.x,
-        this.dropZone.y,
-        this.dropZone.actualRx * 2,
-        this.dropZone.actualRy * 2,
-      );
-      // Also draw center and bottom marker for clarity
-      stroke(255, 200);
-      strokeWeight(1);
-      point(this.dropZone.x, this.dropZone.y);
-      line(
-        this.dropZone.x,
-        this.dropZone.y + this.dropZone.actualRy,
-        this.dropZone.x,
-        this.dropZone.y + this.dropZone.actualRy + 6,
-      );
-      pop();
+      // Debug shapes removed.
     }
 
     // ---- RECIPE BOOK ----
@@ -627,9 +592,10 @@ class Level {
     image(this.assets.recipeBookClosed, r.x, r.y, r.w, rHeight);
 
     // ---- Bottles (Vials) ----
-    // Determine if any vial is currently held so we can suppress
-    // hover effects and defer drawing the held vial on top.
+    // Determine if any vial is currently held or active (moving/pouring)
+    // so we can suppress hover effects and defer drawing the held vial on top.
     const anyVialHeld = this.vials.some((v) => v.isHeld);
+    const anyVialActive = this.vials.some((v) => v.isMoving);
     this.vials.forEach((vial) => {
       // Update held bottle position to follow mouse in real-time (smooth)
       if (vial.isHeld && !vial.isMoving) {
@@ -638,61 +604,65 @@ class Level {
         const my = (mouseY - offsetY) / scaleFactor;
 
         // Smoothly follow the cursor to avoid snapping (still centers on cursor over time)
-        const followSpeed = 0.28; // larger -> snappier, smaller -> more float
+        const followSpeed = 0.9; // larger -> snappier, smaller -> more float
         vial.x = lerp(vial.x, mx, followSpeed);
         vial.y = lerp(vial.y, my, followSpeed);
 
-        // Use the immediate mouse position for hit detection so auto-drop isn't delayed
-        const hitX = mx;
-        const hitY = my;
+        // Continuous collision detection: sample 10 points along the mouse path
+        // between last frame and this frame to catch fast movement that skips the hitbox.
+        const {
+          scaleFactor: sf2,
+          offsetX: ox2,
+          offsetY: oy2,
+        } = getScaleAndOffset();
+        const prevMx = (pmouseX - ox2) / sf2;
+        const prevMy = (pmouseY - oy2) / sf2;
 
-        // Check if held bottle is inside the (asymmetric) drop zone — auto-trigger pour
-        const rxTop =
-          this.dropZone.rxTop || this.dropZone.rx || this.dropZone.r || 0;
-        const rxBottom =
-          this.dropZone.rxBottom || this.dropZone.rx || this.dropZone.r || 0;
-        const ry = this.dropZone.ry || this.dropZone.r || 0;
-        const dzTop =
-          this.dropZone.top !== undefined
-            ? this.dropZone.top
-            : this.dropZone.y - ry;
-        const dzBottom =
-          this.dropZone.bottom !== undefined
-            ? this.dropZone.bottom
-            : this.dropZone.y + ry;
-
-        // Use rectangular hitbox (centered) when available
-        const halfW =
+        const eCx = this.dropZone.x;
+        const eCy = this.dropZone.y; // center of flattened ellipse
+        const rx =
           this.dropZone.actualRx ||
-          rxBottom ||
-          this.dropZone.rx ||
+          this.dropZone.radius ||
           this.dropZone.r ||
           0;
-        const halfH = this.dropZone.actualRy || ry || this.dropZone.r || 0;
+        const ry =
+          this.dropZone.actualRy ||
+          this.dropZone.radius ||
+          this.dropZone.r ||
+          0;
 
-        const left = this.dropZone.x - halfW;
-        const right = this.dropZone.x + halfW;
-        const top = this.dropZone.y - halfH;
-        const bottom = this.dropZone.y + halfH;
-
-        const insideRect =
-          halfW > 0 &&
-          halfH > 0 &&
-          hitX >= left &&
-          hitX <= right &&
-          hitY >= top &&
-          hitY <= bottom;
+        // Semicircular-ellipse (top half) hit test: (dx/rx)^2 + (dy/ry)^2 <= 1 AND sampleY <= centerY
+        const STEPS = 10;
+        let insideRect = false;
+        for (let i = 0; i <= STEPS; i++) {
+          const t = i / STEPS;
+          const sampleX = lerp(prevMx, mx, t);
+          const sampleY = lerp(prevMy, my, t);
+          const ndx = (sampleX - eCx) / rx;
+          const ndy = (sampleY - eCy) / ry;
+          if (
+            rx > 0 &&
+            ry > 0 &&
+            ndx * ndx + ndy * ndy <= 1 &&
+            sampleY <= eCy
+          ) {
+            insideRect = true;
+            break;
+          }
+        }
 
         if (insideRect) {
-          // Auto-drop: bottle pours in place, then returns to shelf
+          // Use the vial's lerped visual position so the pour always starts
+          // from where the vial actually appears on screen, not the mouse.
           vial.droppedFromHeld = true;
-          vial.pourX = vial.x; // use current (lerped) visual position for pour
+          vial.pourX = vial.x;
           vial.pourY = vial.y;
           vial.isMoving = true;
           vial.isHeld = false;
-          // keep the picked-up scale while pouring (reduced)
           vial.targetScale = 1.08;
           vial.progress = 0;
+          // Lock the stream end point so it never jumps during the animation
+          vial.lockedStreamEndX = null; // will be set on first draw frame
         }
       }
 
@@ -714,6 +684,7 @@ class Level {
         !vial.isHeld &&
         !vial.isMoving &&
         !anyVialHeld && // suppress other vial hover while one is held
+        !anyVialActive && // suppress hover while any vial is active (pouring)
         adjustedMX_v > vial.x - halfW_v &&
         adjustedMX_v < vial.x + halfW_v &&
         adjustedMY_v > vial.y - halfH_v &&
@@ -786,6 +757,7 @@ class Level {
               vial.targetScale = 1.0;
               vial.img = vial.closedImg;
               vial.droppedFromHeld = false;
+              vial.lockedStreamEndX = null;
             }
           } else {
             // Original flow: move to cauldron, pour, return to shelf
@@ -876,19 +848,48 @@ class Level {
           const streamStartX = vial.x + openingOffsetX * vial.scale;
           const streamStartY = vial.y + openingOffsetY * vial.scale;
 
-          // Stream ends at the bottom of the drop zone, aligned under the opening
-          const streamEndY = this.dropZone.y + this.dropZone.actualRy;
-          const halfW =
-            this.dropZone.actualRx || this.dropZone.rx || this.dropZone.r || 0;
-          const left = this.dropZone.x - halfW;
-          const right = this.dropZone.x + halfW;
-          let streamEndX = constrain(streamStartX, left + 4, right - 4);
-          const nudge = 8;
-          if (streamStartX < this.dropZone.x) {
-            streamEndX = min(streamEndX + nudge, right - 2);
-          } else {
-            streamEndX = max(streamEndX - nudge, left + 2);
+          // Stream should end at a point on the cauldron rim bottom arc.
+          // Use stored ring dimensions from dropZone to compute the arc point.
+          const cx = this.dropZone.x;
+          const ringW =
+            this.dropZone.ringWidth || this.dropZone.actualRx * 2 || 0;
+          const ringH =
+            this.dropZone.ringHeight || this.dropZone.actualRy * 2 || 0;
+          const rx = ringW / 2;
+          const ry = ringH / 2;
+          // Arc center Y such that bottom of arc = rimY. Prefer the precomputed
+          // value from dropZone so the arc position always matches the cauldron.
+          const arcCenterY =
+            this.dropZone.arcCenterY ||
+            (this.dropZone.rimY || this.dropZone.y + this.dropZone.actualRy) -
+              ry;
+
+          // Choose an X on the ring arc close to the stream start X, clamped to the ring bounds
+          // Lock streamEndX on the first frame of the pour so it never jumps.
+          if (
+            vial.lockedStreamEndX === null ||
+            vial.lockedStreamEndX === undefined
+          ) {
+            // The stream end should land outward in the direction of the tilt.
+            // tiltDir: -1 = clockwise (vial on right, pours left) → endX < startX
+            //           1 = counter-clockwise (vial on left, pours right) → endX > startX
+            const nudge = 20;
+            // Start from the stream start X and push outward by tiltDir
+            let computedEndX = streamStartX + tiltDir * nudge;
+            // Clamp to stay within the cauldron rim bounds
+            computedEndX = constrain(computedEndX, cx - rx + 2, cx + rx - 2);
+            vial.lockedStreamEndX = computedEndX;
           }
+          const streamEndX = vial.lockedStreamEndX;
+
+          // Solve ellipse equation for Y: y = arcCenterY + ry * sqrt(1 - ((x-cx)^2 / rx^2))
+          const dx = streamEndX - cx;
+          let inside = 1 - (dx * dx) / (rx * rx);
+          if (inside < 0) inside = 0;
+          // Offset the stream end slightly above the ring arc so the splash
+          // appears just above the rim rather than exactly on it.
+          const streamOffsetY = 5; // pixels above the ring arc
+          const streamEndY = arcCenterY + ry * sqrt(inside) - streamOffsetY;
 
           const colourMap = {
             // Per-vial id colours (from user)
@@ -1465,6 +1466,10 @@ function levelMousePressed() {
     heldVial.targetScale = 1.0;
     return;
   }
+
+  // Prevent picking up another vial while any vial is active (moving/pouring)
+  const anyVialActive = levelInstance.vials.some((v) => v.isMoving);
+  if (anyVialActive) return;
 
   // No bottle held — try to pick one up by clicking on it
   levelInstance.vials.forEach((vial) => {
