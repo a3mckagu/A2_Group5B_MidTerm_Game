@@ -1101,6 +1101,7 @@ class Level {
     const adjustedMY = (mouseY - offsetY) / scaleFactor;
     const isEnvHovered =
       !anyVialHeld &&
+      !this.vials.some((v) => v.isMoving) &&
       adjustedMX > env.x - env.w / 2 &&
       adjustedMX < env.x + env.w / 2 &&
       adjustedMY > env.y - envHeight / 2 &&
