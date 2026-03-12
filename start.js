@@ -35,7 +35,7 @@ function drawStart() {
   // Responsive button sizing based on viewport
   const btnScaleFactor = min(width / 1024, height / 768);
   const btnWidth1 = 190 * btnScaleFactor;
-  const btnWidth2 = 276 * btnScaleFactor;
+  const btnWidth2 = 331 * btnScaleFactor;
   const btnHeight = 45 * btnScaleFactor;
   const btnTextSize = 17 * btnScaleFactor;
 
@@ -86,7 +86,7 @@ function startMousePressed() {
   // Must match the button sizing in drawStart()
   const btnScaleFactor = min(width / 1024, height / 768);
   const btnWidth1 = 190 * btnScaleFactor;
-  const btnWidth2 = 276 * btnScaleFactor;
+  const btnWidth2 = 331 * btnScaleFactor;
   const btnHeight = 45 * btnScaleFactor;
 
   // For input checks, we only need x,y,w,h (label is optional)

@@ -8,6 +8,10 @@
 const BASE_W = 1152;
 const BASE_H = 648;
 
+// Hover animation state for map icons fade
+let mapIconHoverFade = 0;
+const MAP_ICON_FADE_SPEED = 0.08; // fade speed per frame
+
 function drawMap() {
   background(0);
 
@@ -22,29 +26,46 @@ function drawMap() {
   // Draw background (in base coordinates)
   image(levelMenu, 0, 0, BASE_W, BASE_H);
 
-  // Draw map icons using base coordinates so they scale with the canvas
-  const icon1Config = {
-    icon: mapIcon1,
-    x: BASE_W * 0.28 + 17,
-    y: BASE_H * 0.7,
-    width: 150,
-  };
-  const iconConfigs = [
-    icon1Config,
-    { icon: mapIcon2, x: BASE_W * 0.37 + 17, y: BASE_H * 0.5, width: 150 },
-    { icon: mapIcon3, x: BASE_W * 0.48 + 17, y: BASE_H * 0.64, width: 200 },
-    { icon: mapIcon4, x: BASE_W * 0.62 + 17, y: BASE_H * 0.47, width: 245 },
-  ];
+  // Draw map icons image centered in the middle of the screen
+  const mapIconWidth = 778;
+  const mapIconAspectRatio = mapIconsDefault.height / mapIconsDefault.width;
+  const mapIconHeight = mapIconWidth * mapIconAspectRatio;
+  const mapIconX = BASE_W / 2;
+  const mapIconY = BASE_H / 2;
 
-  iconConfigs.forEach((config) => {
-    if (config.icon) {
-      const aspectRatio = config.icon.height / config.icon.width;
-      const iconHeight = config.width * aspectRatio;
-      imageMode(CENTER);
-      image(config.icon, config.x, config.y, config.width, iconHeight);
-      imageMode(CORNER);
-    }
-  });
+  // Check if mouse is hovering over the image (in base coordinates)
+  const adjustedMX = (mouseX - offsetX) / scaleFactor;
+  const adjustedMY = (mouseY - offsetY) / scaleFactor;
+  const mapIconLeft = mapIconX - mapIconWidth / 2;
+  const mapIconRight = mapIconX + mapIconWidth / 2;
+  const mapIconTop = mapIconY - mapIconHeight / 2;
+  const mapIconBottom = mapIconY + mapIconHeight / 2;
+
+  const isHovering =
+    adjustedMX >= mapIconLeft &&
+    adjustedMX <= mapIconRight &&
+    adjustedMY >= mapIconTop &&
+    adjustedMY <= mapIconBottom;
+
+  // Update fade animation based on hover state
+  if (isHovering) {
+    mapIconHoverFade = min(mapIconHoverFade + MAP_ICON_FADE_SPEED, 1);
+  } else {
+    mapIconHoverFade = max(mapIconHoverFade - MAP_ICON_FADE_SPEED, 0);
+  }
+
+  // Draw default image
+  imageMode(CENTER);
+  image(mapIconsDefault, mapIconX, mapIconY, mapIconWidth, mapIconHeight);
+
+  // Draw hover image on top with fade opacity (only when fading > 0)
+  if (mapIconHoverFade > 0) {
+    tint(255, mapIconHoverFade * 255);
+    image(mapIconsHover, mapIconX, mapIconY, mapIconWidth, mapIconHeight);
+    noTint();
+  }
+
+  imageMode(CORNER);
 
   // Title in base coordinates
   fill("#ceb53a");
@@ -54,25 +75,9 @@ function drawMap() {
   textAlign(CENTER, CENTER);
   text("Alchemy Map", BASE_W / 2, BASE_H * 0.14);
 
-  // Calculate hover using transformed mouse coords
-  const adjustedMX = (mouseX - offsetX) / scaleFactor;
-  const adjustedMY = (mouseY - offsetY) / scaleFactor;
-
-  // ---- Cursor feedback ----
-  const icon1AspectRatio = mapIcon1.height / mapIcon1.width;
-  const icon1Height = icon1Config.width * icon1AspectRatio;
-  const isOverIcon1 = isIconHover(
-    adjustedMX,
-    adjustedMY,
-    icon1Config.x,
-    icon1Config.y,
-    icon1Config.width,
-    icon1Height,
-  );
-
   pop();
 
-  if (isOverIcon1) cursor(HAND);
+  if (isHovering) cursor(HAND);
   else cursor(ARROW);
 }
 
@@ -81,16 +86,7 @@ function drawMap() {
 // ------------------------------------------------------------
 // Called from main.js only when currentScreen === "map"
 function mapMousePressed() {
-  // Check if mapIcon1 is clicked
-  const icon1AspectRatio = mapIcon1.height / mapIcon1.width;
-  const icon1Height = 150 * icon1AspectRatio; // 150 is the width from icon1Config
-  const icon1Config = { x: width * 0.28 + 17, y: height * 0.7, width: 150 };
-
-  if (
-    isIconHover(icon1Config.x, icon1Config.y, icon1Config.width, icon1Height)
-  ) {
-    currentScreen = "level";
-  }
+  currentScreen = "level";
 }
 
 // ------------------------------------------------------------

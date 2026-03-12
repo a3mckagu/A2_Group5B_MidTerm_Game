@@ -37,7 +37,7 @@ let symbolBlack, symbolLightgreen, symbolLightpurple, symbolMidblue, symbolRed;
 let bottleGreen, bottleRed, bottleBlue, bottleOrange, bottlePink;
 let crystalImg, bowlImg, envelopeImg;
 let greenSymbol, blueSymbol, orangeSymbol;
-let mapIcon1, mapIcon2, mapIcon3, mapIcon4;
+let mapIconsDefault, mapIconsHover;
 
 // Font names for use with textFont()
 const FONT_MANUFACTURING_CONSENT = "Manufacturing Consent";
@@ -63,6 +63,7 @@ function preload() {
   orderSheet = loadImage("assets/order/blank-order-sheet-2.png");
   blankOrderSheet2 = loadImage("assets/order/blank-order-sheet-2.png");
   cauldronImg = loadImage("assets/cauldron/cauldron-default-state.png");
+  cauldronImgGlow = loadImage("assets/cauldron/cauldron-glow-state.png");
   recipeBookClosed = loadImage("assets/recipe/recipe-book-default-state.png");
   recipeBookOpen = loadImage("assets/recipe/open-recipe-book.svg");
 
@@ -108,10 +109,8 @@ function preload() {
   symbolRed = loadImage("assets/symbols/symbol-red.svg");
 
   // Map screen icons
-  mapIcon1 = loadImage("assets/background/map-icon_1.svg");
-  mapIcon2 = loadImage("assets/background/map-icon_2.svg");
-  mapIcon3 = loadImage("assets/background/map-icon_3.svg");
-  mapIcon4 = loadImage("assets/background/map-icon_4.svg");
+  mapIconsDefault = loadImage("assets/background/map-icons-default.png");
+  mapIconsHover = loadImage("assets/background/map-icons-hover.png");
 
   levelData = loadJSON("levels.json");
 
@@ -132,6 +131,7 @@ function setup() {
   createCanvas(windowWidth, windowHeight);
   levelInstance = new Level({
     cauldronImg,
+    cauldronImgGlow,
     recipeBookClosed,
     recipeBookOpen,
     levelBg,

@@ -14,7 +14,7 @@ function getScaleAndOffset() {
 }
 // Layout (easy to tweak later)
 const layout = {
-  cauldron: { x: BASE_WIDTH / 2, y: 490, w: 300 },
+  cauldron: { x: BASE_WIDTH / 2, y: 465, w: 300 },
   // moved to bottom-right quadrant (closer to the right/bottom edges)
   // nudged slightly down and a bit smaller
   recipeBook: { x: 1000, y: 540, w: 120 },
@@ -490,6 +490,18 @@ class Level {
       (this.assets.cauldronImg.height / this.assets.cauldronImg.width) * c.w;
     image(this.assets.cauldronImg, c.x, c.y, c.w, cHeight);
 
+    // Overlay cauldron glow image on top of default cauldron
+    if (this.assets.cauldronImgGlow) {
+      // Check if any vial is currently being held
+      const anyVialHeld = this.vials.some((v) => v.isHeld);
+      const glowOpacity = anyVialHeld ? 255 : 0;
+
+      push();
+      tint(255, glowOpacity);
+      image(this.assets.cauldronImgGlow, c.x, c.y, c.w, cHeight);
+      pop();
+    }
+
     // ---- CAULDRON RIM — golden ring precisely at the cauldron opening ----
     if (this.dropZone) {
       // Compute rim position using cauldron image bounds.
@@ -540,7 +552,7 @@ class Level {
       // Store arc center so other code (streams) can reference the exact
       // visual center of the cauldron rim arc; keeps everything in sync
       // if the cauldron image or layout changes or when scaling.
-      this.dropZone.arcCenterY = ringBottom - ringHeight / 2;
+      this.dropZone.arcCenterY = ringBottom - ringHeight / 2 + 33;
       this.dropZone.ringWidth = ringWidth;
       this.dropZone.ringHeight = ringHeight;
       this.dropZone.r = max(semiRx, semiRy);
@@ -616,8 +628,8 @@ class Level {
           const mx = (mouseX - offsetX) / scaleFactor;
           const my = (mouseY - offsetY) / scaleFactor;
 
-          // Smoothly follow the cursor to avoid snapping (still centers on cursor over time)
-          const followSpeed = 0.94; // larger -> snappier, smaller -> more float
+          // Smoothly follow the cursor with a trailing effect (smaller -> more delay/float)
+          const followSpeed = 0.7; // smaller value = more trailing delay behind cursor
           vial.x = lerp(vial.x, mx, followSpeed);
           vial.y = lerp(vial.y, my, followSpeed);
 
