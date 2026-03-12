@@ -256,6 +256,7 @@ class Level {
     this.patienceElapsedAtPause = 0;
     this.patienceDisplayFrac = 1; // visual smoothing
     this._patienceGradientCache = {}; // cache gradient graphics by width+height
+    this._recipeLabelGfx = null; // cached high-res labels graphic
 
     // Return a cached gradient p5.Graphics of given size (creates if missing)
     this._getPatienceGradient = (width, height) => {
@@ -1547,10 +1548,114 @@ class Level {
     const bookLeft = BASE_WIDTH / 2 - bookWidth / 2;
     const bookTop = BASE_HEIGHT / 2 - bookHeight / 2;
 
+    // ---- Left page content ----
+    const leftPageCX = bookLeft + bookWidth * 0.25; // centre of left half
+    const leftPageL = bookLeft + 28; // left text margin
+    const leftPageR = bookLeft + bookWidth / 2 - 24;
+    const leftPageW = leftPageR - leftPageL; // usable text width
+    const bookBottom = bookTop + bookHeight;
+
+    // — VOL. I —
+    noStroke();
+    textFont(FONT_VT323);
+    textSize(15);
+    textAlign(CENTER, TOP);
+    fill(96, 56, 19, 140);
+    text("VOL. I", leftPageCX, bookTop + 36);
+
+    // — Top ornamental rule + diamond —
+    const ruleY1 = bookTop + 56;
+    stroke(96, 56, 19, 75);
+    strokeWeight(0.8);
+    // Draw two segments so there's a clear gap around the central diamond
+    const diamondSize = 5;
+    const gap = 10; // px space on either side of diamond
+    const leftLineX1 = leftPageL + 22;
+    const leftLineX2 = leftPageCX - gap;
+    const rightLineX1 = leftPageCX + gap;
+    const rightLineX2 = leftPageR - 22;
+    line(leftLineX1, ruleY1, leftLineX2, ruleY1);
+    line(rightLineX1, ruleY1, rightLineX2, ruleY1);
+    noStroke();
+    fill(96, 56, 19, 95);
+    push();
+    translate(leftPageCX, ruleY1);
+    rotate(QUARTER_PI);
+    rectMode(CENTER);
+    rect(0, 0, diamondSize, diamondSize);
+    pop();
+
+    // — Potion title —
+    noStroke();
+    textFont(FONT_MANUFACTURING_CONSENT);
+    // Increased size for better readability in recipe contents
+    textSize(30);
+    textAlign(CENTER, TOP);
+    fill(55, 30, 10);
+    text("Beginner's Luck", leftPageCX, bookTop + 66);
+
+    // — Thin rule below title — (removed)
+    // Intentionally omitted to keep the left page cleaner; diamond ornament
+    // above remains as the only decorative divider.
+
+    // — Description (Monsieur La Doulaise italic, word-wrapped) —
+    textFont(FONT_MONSIEUR_LA_DOULAISE);
+    textStyle(ITALIC);
+    // Slightly larger to improve readability; center on the left page
+    textSize(22);
+    textAlign(CENTER, TOP);
+    fill(55, 30, 10, 210);
+
+    const _desc =
+      "Brewed under a waning moon, said to tip fate's scales in the " +
+      "drinker\u2019s  favour before a wager\u2026or a duel.";
+
+    // Manual word-wrap
+    const _words = _desc.split(" ");
+    let _line = "";
+    // Start a little lower so the description sits comfortably under the title
+    let _ty = bookTop + 126;
+    const _lh = 24;
+    // Use a narrower wrap width so the description breaks onto more lines
+    // and draw centered at the left page's center X.
+    const _wrapW = leftPageW * 0.62;
+    const _wrapX = leftPageCX;
+    for (const w of _words) {
+      const test = _line ? _line + " " + w : w;
+      if (textWidth(test) > _wrapW) {
+        text(_line, _wrapX, _ty);
+        _line = w;
+        _ty += _lh;
+      } else {
+        _line = test;
+      }
+    }
+    if (_line) text(_line, _wrapX, _ty);
+    textStyle(NORMAL);
+
+    // — Bottom warning rule — (removed)
+    const _warnRuleY = bookBottom - 58;
+    // line removed to avoid extra dividing rules on the left page
+    // (we still use _warnRuleY for positioning the warning text)
+
+    // — Warning text —
+    textFont(FONT_IM_FELL_ENGLISH);
+    textStyle(ITALIC);
+    textSize(12);
+    textAlign(CENTER, TOP);
+    fill(96, 56, 19, 175);
+    // Shift these warning lines further upward so they are well inside the page
+    text("Tread carefully.", leftPageCX, _warnRuleY - 33);
+    textStyle(NORMAL);
+    textSize(10.5);
+    fill(96, 56, 19, 120);
+    text("A misstep cannot be undone.", leftPageCX, _warnRuleY - 16);
+
     // ---- Pentagon diagram on right page ----
     // All coordinates are in BASE_WIDTH / BASE_HEIGHT space.
     // Diagram centroid sits at (726, 298) — right half of the open book.
-    const CX = 726,
+    const SHIFT_X = 12; // nudge entire diagram right by this many pixels
+    const CX = 726 + SHIFT_X,
       CY = 298; // centroid
     const RING_R = 89; // outer ring radius
     const INNER_R = 36; // inner ring radius
@@ -1561,22 +1666,32 @@ class Level {
     // right=lightred(Last vial), lower-right=lightgreen(Begin here),
     // lower-left=midblue(Follows), left=black(Anchor), top=lightpurple(Nearly)
     const vertices = [
-      { x: 810, y: 273, img: this.assets.symbolRed, label: "Last vial." },
       {
-        x: 777,
+        x: 810 + SHIFT_X,
+        y: 273,
+        img: this.assets.symbolRed,
+        label: "Last vial.",
+      },
+      {
+        x: 777 + SHIFT_X,
         y: 368,
         img: this.assets.symbolLightgreen,
         label: "Begin here.",
       },
       {
-        x: 674,
+        x: 674 + SHIFT_X,
         y: 368,
         img: this.assets.symbolMidblue,
         label: "Follows the first.",
       },
-      { x: 644, y: 273, img: this.assets.symbolBlack, label: "The anchor." },
       {
-        x: 726,
+        x: 644 + SHIFT_X,
+        y: 273,
+        img: this.assets.symbolBlack,
+        label: "The anchor.",
+      },
+      {
+        x: 726 + SHIFT_X,
         y: 208,
         img: this.assets.symbolLightpurple,
         label: "Nearly there.",
@@ -1619,33 +1734,61 @@ class Level {
       }
     }
 
-    // -- Flavour labels just clockwise on the ring, horizontal, Monsieur La Doulaise --
-    textFont(FONT_MONSIEUR_LA_DOULAISE);
-    textSize(14);
-    textAlign(LEFT, CENTER);
-    textStyle(NORMAL);
+    // Render the flavour labels into a cached high-resolution graphics
+    // (2x) so they remain crisp when the whole BASE space is scaled.
+    const makeRecipeLabelGfx = () => {
+      const DPR = 2;
+      const w = BASE_WIDTH * DPR;
+      const h = BASE_HEIGHT * DPR;
+      const g = createGraphics(w, h);
+      g.pixelDensity(1);
+      g.clear();
+      g.push();
+      g.textFont(FONT_MONSIEUR_LA_DOULAISE);
+      g.textSize(20 * DPR);
+      g.textAlign(LEFT, CENTER);
+      g.textStyle(NORMAL);
+      g.noStroke();
+      // Label color: #2D0A03 -> RGB(45,10,3). Preserve LABEL_ALPHA for opacity.
+      g.fill(45, 10, 3, LABEL_ALPHA);
+      for (const v of vertices) {
+        // Compute symbol render height to offset label clear of the symbol graphic
+        const symbolH = (v.img.height / v.img.width) * SYM;
+        const offset = symbolH / 2 + 8; // px clear distance from symbol edge
+        const extraDown = 6; // additional downward nudge for lower labels
+        // Place "Nearly there." above its symbol; others below their symbols.
+        let lx = v.x;
+        const ly =
+          v.label === "Nearly there." ? v.y - offset : v.y + offset + extraDown;
+        // Increase horizontal spacing between lower-left and lower-right labels
+        if (v.label === "Begin here.") lx += 12;
+        else if (v.label === "Follows the first.") lx -= 12;
+        // Use centered alignment; choose vertical anchor per position
+        if (v.label === "Nearly there.") {
+          g.textAlign(CENTER, BOTTOM);
+        } else {
+          g.textAlign(CENTER, TOP);
+        }
+        g.text(v.label, lx * DPR, ly * DPR);
+      }
+      g.pop();
+      return g;
+    };
 
-    for (const v of vertices) {
-      const dx = v.x - CX,
-        dy = v.y - CY;
-      const dist_ = Math.sqrt(dx * dx + dy * dy);
-      const ux = dx / dist_,
-        uy = dy / dist_;
-      // CW tangent: rotate outward vector 90° clockwise
-      const step = (SYM / 2 + 6) / RING_R; // radians to clear symbol edge
-      const baseAngle = Math.atan2(dy, dx);
-      const labelAngle = baseAngle + step;
-      const lx = CX + RING_R * Math.cos(labelAngle);
-      const ly = CY + RING_R * Math.sin(labelAngle);
-      fill(96, 56, 19, LABEL_ALPHA); // #603813 with alpha
-      noStroke();
-      text(v.label, lx, ly);
-    }
+    if (!this._recipeLabelGfx) this._recipeLabelGfx = makeRecipeLabelGfx();
+    // If you want dynamic updates (e.g., locale changes) you'd recreate the gfx.
+    // Draw the high-res labels onto the main canvas (scale-down by drawing at BASE size).
+    imageMode(CORNER);
+    image(this._recipeLabelGfx, 0, 0, BASE_WIDTH, BASE_HEIGHT);
+    imageMode(CENTER);
 
     // -- Close button (top-right corner of book) --
-    const btnSize = 30;
-    const btnX = bookLeft + bookWidth - btnSize / 2;
-    const btnY = bookTop + btnSize / 2;
+    // Larger close button for recipe screen (keeps same offsets)
+    const btnSize = 36;
+    // Shift slightly further beyond the inner margin to sit at the book's top-right
+    const btnX = bookLeft + bookWidth - btnSize / 2 + 32;
+    // Move a bit higher (closer to the top edge of the book)
+    const btnY = bookTop + btnSize / 2 - 26;
 
     const {
       scaleFactor: _sf,
@@ -1666,9 +1809,8 @@ class Level {
     rect(btnX, btnY, btnSize, btnSize, 5);
     fill("#FFF4E5");
     textAlign(CENTER, CENTER);
-    textFont(FONT_VT323);
-    textSize(18);
-    text("×", btnX, btnY - 1);
+    textSize(26);
+    text("×", btnX, btnY + 3);
 
     pop();
   }
