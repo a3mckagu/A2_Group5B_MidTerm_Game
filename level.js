@@ -292,6 +292,7 @@ class Level {
     // Drop zone placed above the cauldron; radius adjustable
     // default radius reduced for a smaller outline
     this.dropZone = { x: layout.cauldron.x, y: layout.cauldron.y - 220, r: 26 };
+    this.recipeBookLift = 0; // persistent lift for smooth hover animation
   }
 
   checkSequence() {
@@ -311,10 +312,22 @@ class Level {
   }
 
   draw(paused = false) {
-    // Background
+    // Background: if the recipe book is open and a recipe background is available,
+    // show the recipe-book background; otherwise use the normal level background.
     imageMode(CORNER);
-    image(this.assets.levelBg, 0, 0, BASE_WIDTH, BASE_HEIGHT);
+    const bgImage =
+      this.isRecipeOpen && this.assets.recipeBookBg
+        ? this.assets.recipeBookBg
+        : this.assets.levelBg;
+    image(bgImage, 0, 0, BASE_WIDTH, BASE_HEIGHT);
     imageMode(CENTER);
+
+    // If the recipe book is open, render the focused recipe screen here and
+    // return early so no gameplay elements are drawn or interactable.
+    if (this.isRecipeOpen) {
+      this._drawRecipeBookOpen();
+      return;
+    }
 
     // Initialize patience timer and update display only when not paused
     let displayFrac = this.patienceDisplayFrac;
@@ -553,119 +566,38 @@ class Level {
       r.w;
 
     if (this.isRecipeOpen) {
-      push();
-      // Brown overlay placeholder (will be replaced with an image)
-      fill("#68452E");
-      rectMode(CORNER);
-      rect(0, 0, BASE_WIDTH, BASE_HEIGHT);
-      pop();
-
-      const openBook = this.assets.recipeBookOpen;
-      const bookWidth = 600;
-      const bookHeight = (openBook.height / openBook.width) * bookWidth;
-      imageMode(CENTER);
-      image(openBook, BASE_WIDTH / 2, BASE_HEIGHT / 2, bookWidth, bookHeight);
-
-      const bookLeft = BASE_WIDTH / 2 - bookWidth / 2;
-      const bookTop = BASE_HEIGHT / 2 - bookHeight / 2;
-
-      const textX = BASE_WIDTH / 2 - bookWidth / 2 + 40;
-      let textY = BASE_HEIGHT / 2 - bookHeight / 2 + 50;
-      const lineHeight = 30;
-      const symbolWidth = 20;
-
-      textSize(18);
-      textStyle(BOLD);
-      fill(0);
-      text("Beginner's Luck", textX + 100, textY);
-      textStyle(NORMAL);
-      textSize(14);
-      textAlign(LEFT, TOP);
-      textY += lineHeight * 2;
-
-      text("1. Pour a vial of ", textX, textY);
-      image(
-        greenSymbol,
-        textX + 116,
-        textY + 6,
-        symbolWidth,
-        (greenSymbol.height / greenSymbol.width) * symbolWidth,
-      );
-      text("into the", textX + 134, textY);
-      text(
-        "cauldron to tilt fate in your favour.",
-        textX + 16,
-        textY + lineHeight - 10,
-      );
-      textY += lineHeight;
-
-      text("2. Mix in ", textX, textY + 20);
-      image(
-        blueSymbol,
-        textX + 70,
-        textY + 26,
-        symbolWidth,
-        (blueSymbol.height / blueSymbol.width) * symbolWidth,
-      );
-      text(" to strengthen the brew.", textX + 84, textY + 20);
-      textY += lineHeight;
-
-      text("3. Add ", textX, textY + 20);
-      image(
-        orangeSymbol,
-        textX + 60,
-        textY + 26,
-        symbolWidth,
-        (orangeSymbol.height / orangeSymbol.width) * symbolWidth,
-      );
-      text("to bind the ingredients.", textX + 80, textY + 20);
-      textY += lineHeight;
-
-      text("4. Drop in ", textX, textY + 26);
-      image(
-        crystalImg,
-        textX + 80,
-        textY + 30,
-        symbolWidth,
-        (crystalImg.height / crystalImg.width) * symbolWidth,
-      );
-      text(" to seal the spell and", textX + 95, textY + 26);
-      text("awaken its magic.", textX + 16, textY + lineHeight + 16);
-
-      const btnSize = 30;
-      const btnX = bookLeft + bookWidth - btnSize / 2;
-      const btnY = bookTop + btnSize / 2;
-      // Compute adjusted mouse coords for hover detection (scaled canvas)
-      const {
-        scaleFactor: _sf,
-        offsetX: _ox,
-        offsetY: _oy,
-      } = getScaleAndOffset();
-      const adjustedMX_book = (mouseX - _ox) / _sf;
-      const adjustedMY_book = (mouseY - _oy) / _sf;
-
-      const isCloseBtnHovered =
-        adjustedMX_book > btnX - btnSize / 2 &&
-        adjustedMX_book < btnX + btnSize / 2 &&
-        adjustedMY_book > btnY - btnSize / 2 &&
-        adjustedMY_book < btnY + btnSize / 2;
-
-      push();
-      rectMode(CENTER);
-      fill(isCloseBtnHovered ? "#E83030" : "#D00000");
-      noStroke();
-      rect(btnX, btnY, btnSize, btnSize, 5);
-      fill("#FFF4E5");
-      textAlign(CENTER, CENTER);
-      textSize(18);
-      text("×", btnX, btnY - 1);
-      pop();
-
+      this._drawRecipeBookOpen();
       return;
     }
 
-    // Draw closed book
-    image(this.assets.recipeBookClosed, r.x, r.y, r.w, rHeight);
+    // Draw closed book with smooth hover lift (visual only; click area unchanged)
+    let desiredLift = 0;
+    if (!paused) {
+      const { scaleFactor, offsetX, offsetY } = getScaleAndOffset();
+      const adjustedMX = (mouseX - offsetX) / scaleFactor;
+      const adjustedMY = (mouseY - offsetY) / scaleFactor;
+      const bookLeft = r.x - r.w / 2;
+      const bookTop = r.y - rHeight / 2;
+      // Use the currently-drawn book position (account for persistent lift)
+      const bookTopAdj = bookTop + (this.recipeBookLift || 0);
+      const bookBottomAdj = bookTopAdj + rHeight;
+      if (
+        adjustedMX >= bookLeft &&
+        adjustedMX <= bookLeft + r.w &&
+        adjustedMY >= bookTopAdj &&
+        adjustedMY <= bookBottomAdj
+      ) {
+        desiredLift = -5; // target lift (px)
+      }
+    }
+    this.recipeBookLift = lerp(this.recipeBookLift || 0, desiredLift, 0.18);
+    image(
+      this.assets.recipeBookClosed,
+      r.x,
+      r.y + this.recipeBookLift,
+      r.w,
+      rHeight,
+    );
 
     // ---- Bottles (Vials) ----
     // Determine if any vial is currently held or active (moving/pouring)
@@ -1597,6 +1529,148 @@ class Level {
       this.patiencePaused = true;
       this.patienceElapsedAtPause = millis() - (this.patienceStart || 0);
     }
+  }
+
+  // -------------------------------------------------------
+  // _drawRecipeBookOpen()
+  // Draws the open recipe book with the pentagon symbol diagram
+  // on the right page. Called whenever isRecipeOpen is true.
+  // -------------------------------------------------------
+  _drawRecipeBookOpen() {
+    const openBook = this.assets.recipeBookOpen;
+    const bookWidth = 600;
+    const bookHeight = (openBook.height / openBook.width) * bookWidth;
+    imageMode(CENTER);
+    // Intentionally do not draw the open-book svg asset (openBook)
+    // The recipe screen will render its content without the SVG background.
+
+    const bookLeft = BASE_WIDTH / 2 - bookWidth / 2;
+    const bookTop = BASE_HEIGHT / 2 - bookHeight / 2;
+
+    // ---- Pentagon diagram on right page ----
+    // All coordinates are in BASE_WIDTH / BASE_HEIGHT space.
+    // Diagram centroid sits at (726, 298) — right half of the open book.
+    const CX = 726,
+      CY = 298; // centroid
+    const RING_R = 89; // outer ring radius
+    const INNER_R = 36; // inner ring radius
+    const SYM = 28; // symbol render size (square)
+    const LABEL_ALPHA = 200; // opacity for flavour text (0-255)
+
+    // Vial images mapped to each vertex (clockwise from 3-o'clock)
+    // right=lightred(Last vial), lower-right=lightgreen(Begin here),
+    // lower-left=midblue(Follows), left=black(Anchor), top=lightpurple(Nearly)
+    const vertices = [
+      { x: 810, y: 273, img: this.assets.symbolRed, label: "Last vial." },
+      {
+        x: 777,
+        y: 368,
+        img: this.assets.symbolLightgreen,
+        label: "Begin here.",
+      },
+      {
+        x: 674,
+        y: 368,
+        img: this.assets.symbolMidblue,
+        label: "Follows the first.",
+      },
+      { x: 644, y: 273, img: this.assets.symbolBlack, label: "The anchor." },
+      {
+        x: 726,
+        y: 208,
+        img: this.assets.symbolLightpurple,
+        label: "Nearly there.",
+      },
+    ];
+
+    push();
+
+    // -- Outer and inner rings --
+    noFill();
+    stroke(90, 55, 18, 46); // rgba(90,55,18,0.18) → alpha ~46
+    strokeWeight(1);
+    ellipseMode(CENTER);
+    circle(CX, CY, RING_R * 2);
+    stroke(90, 55, 18, 26);
+    circle(CX, CY, INNER_R * 2);
+
+    // -- Pentagon outline (dashed approximation via short segments) --
+    stroke(90, 55, 18, 28);
+    strokeWeight(1);
+    noFill();
+    beginShape();
+    for (const v of vertices) vertex(v.x, v.y);
+    endShape(CLOSE);
+
+    // -- Spokes from centroid to each vertex --
+    stroke(90, 55, 18, 18);
+    strokeWeight(0.8);
+    for (const v of vertices) {
+      line(CX, CY, v.x, v.y);
+    }
+
+    // -- Symbols (vial images) centred on each vertex --
+    imageMode(CENTER);
+    noStroke();
+    for (const v of vertices) {
+      if (v.img) {
+        const h = (v.img.height / v.img.width) * SYM;
+        image(v.img, v.x, v.y, SYM, h);
+      }
+    }
+
+    // -- Flavour labels just clockwise on the ring, horizontal, Monsieur La Doulaise --
+    textFont(FONT_MONSIEUR_LA_DOULAISE);
+    textSize(14);
+    textAlign(LEFT, CENTER);
+    textStyle(NORMAL);
+
+    for (const v of vertices) {
+      const dx = v.x - CX,
+        dy = v.y - CY;
+      const dist_ = Math.sqrt(dx * dx + dy * dy);
+      const ux = dx / dist_,
+        uy = dy / dist_;
+      // CW tangent: rotate outward vector 90° clockwise
+      const step = (SYM / 2 + 6) / RING_R; // radians to clear symbol edge
+      const baseAngle = Math.atan2(dy, dx);
+      const labelAngle = baseAngle + step;
+      const lx = CX + RING_R * Math.cos(labelAngle);
+      const ly = CY + RING_R * Math.sin(labelAngle);
+      fill(96, 56, 19, LABEL_ALPHA); // #603813 with alpha
+      noStroke();
+      text(v.label, lx, ly);
+    }
+
+    // -- Close button (top-right corner of book) --
+    const btnSize = 30;
+    const btnX = bookLeft + bookWidth - btnSize / 2;
+    const btnY = bookTop + btnSize / 2;
+
+    const {
+      scaleFactor: _sf,
+      offsetX: _ox,
+      offsetY: _oy,
+    } = getScaleAndOffset();
+    const adjustedMX_book = (mouseX - _ox) / _sf;
+    const adjustedMY_book = (mouseY - _oy) / _sf;
+    const isCloseBtnHovered =
+      adjustedMX_book > btnX - btnSize / 2 &&
+      adjustedMX_book < btnX + btnSize / 2 &&
+      adjustedMY_book > btnY - btnSize / 2 &&
+      adjustedMY_book < btnY + btnSize / 2;
+
+    rectMode(CENTER);
+    fill(isCloseBtnHovered ? "#E83030" : "#D00000");
+    noStroke();
+    rect(btnX, btnY, btnSize, btnSize, 5);
+    fill("#FFF4E5");
+    textAlign(CENTER, CENTER);
+    textFont(FONT_VT323);
+    textSize(18);
+    text("×", btnX, btnY - 1);
+
+    pop();
   }
 }
 

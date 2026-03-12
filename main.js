@@ -31,7 +31,9 @@ let levelBg,
   blankOrderSheet2,
   cauldronImg,
   recipeBookClosed,
-  recipeBookOpen;
+  recipeBookOpen,
+  recipeBookBg;
+let symbolBlack, symbolLightgreen, symbolLightpurple, symbolMidblue, symbolRed;
 let bottleGreen, bottleRed, bottleBlue, bottleOrange, bottlePink;
 let crystalImg, bowlImg, envelopeImg;
 let greenSymbol, blueSymbol, orangeSymbol;
@@ -57,6 +59,7 @@ function preload() {
 
   // Level 1 assets
   levelBg = loadImage("assets/background/blue-lvl.png");
+  recipeBookBg = loadImage("assets/background/recipe-book.png");
   orderSheet = loadImage("assets/order/blank-order-sheet-2.png");
   blankOrderSheet2 = loadImage("assets/order/blank-order-sheet-2.png");
   cauldronImg = loadImage("assets/cauldron/cauldron-default-state.png");
@@ -98,6 +101,11 @@ function preload() {
   greenSymbol = loadImage("assets/symbols/green-symbol.svg");
   blueSymbol = loadImage("assets/symbols/blue-symbol.svg");
   orangeSymbol = loadImage("assets/symbols/orange-symbol.svg");
+  symbolBlack = loadImage("assets/symbols/symbol-black.svg");
+  symbolLightgreen = loadImage("assets/symbols/symbol-lightgreen.svg");
+  symbolLightpurple = loadImage("assets/symbols/symbol-lightpurple.svg");
+  symbolMidblue = loadImage("assets/symbols/symbol-midblue.svg");
+  symbolRed = loadImage("assets/symbols/symbol-red.svg");
 
   // Map screen icons
   mapIcon1 = loadImage("assets/background/map-icon_1.svg");
@@ -161,6 +169,17 @@ function setup() {
     blueSymbol,
     orangeSymbol,
   });
+
+  // Also provide the recipe-book background asset so the level can switch
+  // the background when the recipe book is opened.
+  levelInstance.assets.recipeBookBg = recipeBookBg;
+
+  // Attach additional symbol assets for recipe rendering
+  levelInstance.assets.symbolBlack = symbolBlack;
+  levelInstance.assets.symbolLightgreen = symbolLightgreen;
+  levelInstance.assets.symbolLightpurple = symbolLightpurple;
+  levelInstance.assets.symbolMidblue = symbolMidblue;
+  levelInstance.assets.symbolRed = symbolRed;
 }
 
 function windowResized() {

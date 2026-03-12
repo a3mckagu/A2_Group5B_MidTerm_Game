@@ -104,7 +104,7 @@ const Results = {
       btnBorderCol = color(200, 184, 32);
       btnTextCol = color(232, 216, 64);
       headingText = "Too Slow!";
-      statusText = "ORDER ABANDONED";
+      statusText = "ORDER CANCELLED";
       quoteText =
         "I am a lord, not a patient man.\nMy luck won't wait forever and neither shall I.";
       attrText = "\u2014 Lord Alistair, already halfway out the door";
@@ -491,7 +491,10 @@ const Results = {
         blueSymbol,
         orangeSymbol,
       });
-
+      // Ensure the recipe-book background asset is attached (matches setup())
+      if (typeof recipeBookBg !== "undefined") {
+        levelInstance.assets.recipeBookBg = recipeBookBg;
+      }
       return;
     }
 
