@@ -929,6 +929,14 @@ class Level {
 
       // If this vial is currently held, skip drawing here so we can
       // render it later on top of UI elements (envelope, badges).
+      // Also: when results are showing for CORRECT or WRONG (i.e. the
+      // crystal was added and the level has a final result), hide the
+      // crystal entirely so it doesn't appear behind the overlay.
+      if (vial.isCrystal) {
+        if (this.levelResult === "CORRECT" || this.levelResult === "WRONG") {
+          return;
+        }
+      }
       if (vial.isHeld) return;
 
       // ---- LIQUID STREAM during pour (drawn behind the vial)
