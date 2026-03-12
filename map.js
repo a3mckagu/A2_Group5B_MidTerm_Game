@@ -11,6 +11,15 @@ const BASE_H = 648;
 // Hover animation state for map icons fade
 let mapIconHoverFade = 0;
 const MAP_ICON_FADE_SPEED = 0.08; // fade speed per frame
+// Toggle to show hit areas for debugging
+let SHOW_HIT_AREAS = false;
+
+// Level1 hit-area parameters (relative to map image center)
+// Final defaults (aligned to Level 1 artwork). Use debug keys if needed.
+// Values chosen from interactive tuning overlay.
+let level1RelX = -0.4; // negative = left
+let level1RelY = 0.295; // positive = down
+let level1RelDiameter = 0.18;
 
 function drawMap() {
   background(0);
@@ -32,20 +41,53 @@ function drawMap() {
   const mapIconHeight = mapIconWidth * mapIconAspectRatio;
   const mapIconX = BASE_W / 2;
   const mapIconY = BASE_H / 2;
-
-  // Check if mouse is hovering over the image (in base coordinates)
+  // Check if mouse is hovering over the Level 1 circle (in base coordinates)
   const adjustedMX = (mouseX - offsetX) / scaleFactor;
   const adjustedMY = (mouseY - offsetY) / scaleFactor;
-  const mapIconLeft = mapIconX - mapIconWidth / 2;
-  const mapIconRight = mapIconX + mapIconWidth / 2;
-  const mapIconTop = mapIconY - mapIconHeight / 2;
-  const mapIconBottom = mapIconY + mapIconHeight / 2;
 
-  const isHovering =
-    adjustedMX >= mapIconLeft &&
-    adjustedMX <= mapIconRight &&
-    adjustedMY >= mapIconTop &&
-    adjustedMY <= mapIconBottom;
+  // Level 1 circle hit area (positioned relative to the map icons image)
+  const level1X = mapIconX + mapIconWidth * level1RelX;
+  const level1Y = mapIconY + mapIconHeight * level1RelY;
+  const level1Diameter = mapIconWidth * level1RelDiameter;
+
+  const dx = adjustedMX - level1X;
+  const dy = adjustedMY - level1Y;
+  const distToLevel1 = Math.sqrt(dx * dx + dy * dy);
+  const isHovering = distToLevel1 <= level1Diameter / 2;
+
+  // Debug: draw the hit area so we can visually tune it
+  if (SHOW_HIT_AREAS) {
+    push();
+    noFill();
+    stroke(255, 0, 0, 180);
+    strokeWeight(2 / scaleFactor); // keep visible across scales
+    ellipseMode(CENTER);
+    ellipse(level1X, level1Y, level1Diameter, level1Diameter);
+    // mark center
+    fill(255, 0, 0, 200);
+    noStroke();
+    const centerSize = 6 / scaleFactor;
+    ellipse(level1X, level1Y, centerSize, centerSize);
+    pop();
+  }
+  // Debug overlay with current params (screen coords)
+  if (SHOW_HIT_AREAS) {
+    push();
+    noStroke();
+    fill(0, 0, 0, 140);
+    const boxW = 300;
+    const boxH = 90;
+    rect(16, height - boxH - 16, boxW, boxH, 8);
+    fill(255);
+    textAlign(LEFT, TOP);
+    textSize(12);
+    text(
+      `A/D: left/right  W/X: up/down  Q/E: smaller/larger\nrelX: ${level1RelX.toFixed(3)}  relY: ${level1RelY.toFixed(3)}  relD: ${level1RelDiameter.toFixed(3)}`,
+      24,
+      height - boxH - 8
+    );
+    pop();
+  }
 
   // Update fade animation based on hover state
   if (isHovering) {
@@ -102,6 +144,57 @@ function mapKeyPressed() {
 
   if (key === "s" || key === "S") {
     currentScreen = "start";
+  }
+
+  // Debug: adjust Level1 hit area when toggle enabled
+  if (SHOW_HIT_AREAS) {
+    // Move left/right
+    if (key === "a" || key === "A") {
+      level1RelX -= 0.005;
+    }
+    if (key === "d" || key === "D") {
+      level1RelX += 0.005;
+    }
+    // Move up/down (remember relY positive is down)
+    if (key === "w" || key === "W") {
+      level1RelY -= 0.005;
+    }
+    if (key === "x" || key === "X") {
+      level1RelY += 0.005;
+    }
+    // Diameter adjust
+    if (key === "q" || key === "Q") {
+      level1RelDiameter = max(0.01, level1RelDiameter - 0.005);
+    }
+    if (key === "e" || key === "E") {
+      level1RelDiameter = min(0.8, level1RelDiameter + 0.005);
+    }
+    // Toggle debug overlay with D
+    if (key === "d" || key === "D") {
+      SHOW_HIT_AREAS = !SHOW_HIT_AREAS;
+    }
+    // Save current values to localStorage for convenience (press P)
+    if (key === "p" || key === "P") {
+      try {
+        localStorage.setItem(
+          "level1Hit",
+          JSON.stringify({ level1RelX, level1RelY, level1RelDiameter })
+        );
+        console.log("Saved level1 hit values", { level1RelX, level1RelY, level1RelDiameter });
+      } catch (e) {}
+    }
+    // Load values (L)
+    if (key === "l" || key === "L") {
+      try {
+        const raw = localStorage.getItem("level1Hit");
+        if (raw) {
+          const obj = JSON.parse(raw);
+          level1RelX = obj.level1RelX;
+          level1RelY = obj.level1RelY;
+          level1RelDiameter = obj.level1RelDiameter;
+        }
+      } catch (e) {}
+    }
   }
 
   // ESC to return disabled temporarily
