@@ -12,33 +12,22 @@ Assignment 2 - Mid-term Game: Potionary, A Crafting Puzzle Game
 
 ## Description
 
-> Overview: Potionary is a challenging potion-crafting puzzle game where players match coloured vials and symbols to fulfill recipe orders. In the tutorial level (level one), players must manage 5 potion vials (from a shelf of 12 vials). Constraints, including "customer patience" time limit, recipe book managemnet, and symbol interpretation, challenge players' management skills.
+Potionary is a potion-crafting puzzle game where players fulfill customer orders by matching symbols from a recipe book to ingredient vials. In the first level, players must add a specific sequence of five vials (from a shelf of twelve) to a cauldron in the correct order to succeed. A "Customer Patience" timer begins immediately, requiring players to carefully balance speed with accuracy.
 
-> The player sees an alchemist's work rooom (laboratory) with shelves of colourful bottles, a large cauldron, and an order sheet hidden behind a HUD envolop that lists the recipe requirements. Within the environment, the player is immersed in a multi-sensory experience with visuals, text, and medieval-inspired music.
-> Players drag vials from the shelf to the cauldron, matching context clues to the recipe specification. Visual feedback includes glowing cauldron effects to indicate drag features and colour liquid pouring animations that guide the player through an immersive potion-crafting process.
-> Potionary explores how visual feedback can communicate accessibility states to both novice and expert players. In particular exploring dyslexia and nudging users to develop empathy in a frustrating but entertaining game.
-> Each level follows the core loop of the game: dragging objects into a cauldron and viewing their correctness after dragging the crystal last into the cauldron.
-> The design is inspired by the artistic, hand-drawn, medieval art style of Potion Craft Alchemist Simulator (2022) alongside tactile, "pouring" user actions from the viral mobile game Water Sort Puzzle (2020). Player feedback from widely known crafting, puzzle games include the poor management of difficulty (low complexity in level 1 and impossible by final level), low focus on potion crafting mechanics and feedback (focus on sci-fi storylines). We identified 5 points to build on:
+The game is designed to foster empathy and understanding for individuals with dyslexia. For someone with dyslexia, reading can feel like decoding words in a foreign language - slow, effortful, and mentally exhausting. Even short periods of reading demand intense concentration. Potionary mirrors these experiences through symbols that are visually similar, a challenging-to-read font, and a recipe design that is intentionally difficult to interpret.
 
-1.  Deliver high-value to users through puzel focus (simplify user inteactions and maintain focus on concept of management and decoding recepies).
-2.  Stylized Art that Evokes Nostalgia and Appeals to a Wide Young Base: Inspired by art from Victorian-era floral motifs, medieval colour palettes, and adventure genre maps.
-3.  Creative focus on symbolism: Strong employment of symbols to communicate recipe ideas to challenge player memory, management, and decoding.
+In addition, many people with dyslexia develop unique, often unconscious strategies to "decode" text, relying on context, visual memory, or multi-sensory techniques. As such, Potionary reflects not only the challenges people with dyslexia face, but also the ways they adapt.
+
+The design is inspired by the artistic, hand-drawn, medieval art style of Potion Craft Alchemist Simulator (2022) alongside tactile, "pouring" user actions from the viral mobile game Water Sort Puzzle (2020).
 
 ---
 
 ## Setup and Interaction Instructions
 
-> How to Start: Players open the game in a web browser and click "New Game" on the start screen to begin. They then proceed to level one via clicking on the map.
-> Controls: Left click and drag vials from the shelf to the cauldron. Left click the recipe book to view potion instructions. Left click the order envelope to confirm completed potions.
-> Visual Feedback: The cauldron glows when a user "picks up" a vial or crystal, indicating the drop zone. Incorrectly matched vials provide visual feedback once the user runs out of time or completes the incorrect order (fail state / win state).
-> Audio Experience: Medieval-themed background music evokes escapism, intrigue, and pressure, playing on an infinite loop during gameplay.
-
----
-
-## Interaction Notes
-
-> At level one, players must open one customer order, reference their recipe book, then sequence multiple vials and a crystal in the correct order to achieve a win state. The recipe requires 5 potion bottles to be correctly added to the cauldron from a shelf containing 12 similar vials. Matching the symbols creates higher cognitive load.
-> There is rapid visual feedback with image hover states to smoothly onboard new players.
+- How to Start: Players view the "Aclhemist's Handbook" for instructions. They then on click "New Game" on the start screen and proceed to level one by clicking on "Level 1: Beginner's Luck" on the level map.
+- Controls: View orders by clicking on the envelope icon. Click on the recipe book to view the order steps. Click and move vials from the shelf to the cauldron. Click and move the crystal to finish the potion.
+- Visual Feedback: The cauldron glows when a user "picks up" a vial or crystal, indicating the drop zone. Incorrectly matched vials provide visual feedback once the user runs out of time or completes the incorrect order (fail state / win state).
+- Audio Experience: Medieval-themed background music evokes escapism, intrigue, and pressure, playing on an infinite loop during gameplay.
 
 ---
 
@@ -46,9 +35,9 @@ Assignment 2 - Mid-term Game: Potionary, A Crafting Puzzle Game
 
 Three changes made based on playtesting:
 
-1. Evoke Frustration & Increase Complexity of Level One: Improve game theme of dyslexia via promoting immediate frustration and reading challenges. Specific action items include: increasing the number of vials on the shelf from 5 to 12; utilizing a cursive, script font that is difficult to decode; and potentially adding a time limit to mirror real-life, time-dependent circumstances.
-2. Strengthen Symbolism & Player Management Mechanics: Create Distinct In-Game Views: Rather than relying on one alchemist labratory background for the entirety of level one, opt for an additional background (specifically a wooden table). This will increase effectiveness of the user management mechanic (recipe screen vs potion crafting screen). Additionally, remove colours from vial symbols and increase similarities to increase frustration and player's need to decode information contextually.
-3. Implement Clearer User Feedback Systems: Add hover states to all objects to increase tactility and intuitive interactions. Specifically, elevate potion bottles when hovered upon and add a subtle glow to the cauldron's top to indicate direct "dropping" zone. Additionally, account for multiple user preferences (dragging and click interactions both allowed for moving objects into the cauldron).
+1. Evoke Frustration & Increase Complexity of Level One: Improve game theme of dyslexia by promoting immediate frustration and cognitive load. Specific action items include: increasing the number of vials on the shelf from 5 to 12; utilizing a cursive, script font that is difficult to decode; and adding a time limit to mirror real-life, time-dependent circumstances.
+2. Implement Clearer User Feedback Systems: Add hover states to all objects to increase tactility and intuitive interactions (e.g. elevate ingredient vials and crystal when hovered upon, add a subtle glow to the cauldron's top to indicate direct "dropping" zone).
+3. Implement Click-to-Move: To add ingredients to the cauldron, players click on an ingredient and move it to the cauldron’s mouth (without holding the mouse down). This interaction was intentionally designed to support accessibility, as players with motor impairments may find holding and dragging difficult.
 
 ---
 
@@ -56,14 +45,14 @@ Three changes made based on playtesting:
 
 Two planned improvements include:
 
-> Reducing the Complexity of Level One Recipe: Aim to include only 3 vials to contain cognitive load and frustration experienced by beginners.
-> Enhance Interactivity of the Audio-Visual Experience: Add more visual feedback such as several cursor states when the player drags objects and hovers over HUD elements. Furthurmore, adding sound effects for subtle interactions, including picking up glasses and pouring liquids, along with music that increases in intensity as the level time limit approaches the end.
+> Reducing the Complexity of Level One Recipe: Aim to include only 3 vials instead of 5.
+> Enhancing the Audio Experience: Edit background music so that it increases in intensity as customer patience depletes.
 
 ---
 
 ## Assets
 
-> - `assets/audio/medieval-music.mp3` (Tunetank 2025)
+> - `assets/audio/medieval-music.mp3` [9]
 > - `assets/background/blue-lvl.png` (original artwork)
 > - `assets/background/level-menu.png` (original artwork)
 > - `assets/background/map-icons-default.png` (original artwork)
@@ -79,13 +68,11 @@ Two planned improvements include:
 > - `assets/brand/potionary-logo.svg` (original artwork)
 > - `assets/cauldron/cauldron-default-state.png` (original artwork)
 > - `assets/cauldron/cauldron-glow-state.png` (original artwork)
-> - `assets/crystal/brown-bowl.png` (original artwork)
+> - `assets/crystal/brown-bowl.png` (generated by Gemini, manually edited in Figma)
 > - `assets/crystal/crystal-v2.png` (original artwork)
 > - `assets/crystal/crystal-v2.svg` (original artwork)
-> - `assets/order/blank-order-sheet-2.png` (original artwork)
-> - `assets/order/envelope.png` (original artwork)
-> - `assets/sound/bubbles_pour.mp3` (original artwork)
-> - `assets/sound/medieval-music.mp3` (original artwork)
+> - `assets/order/blank-order-sheet-2.png` [3]
+> - `assets/order/envelope.png` [2]
 > - `assets/symbols/blue-symbol.svg` (original artwork)
 > - `assets/symbols/green-symbol.svg` (original artwork)
 > - `assets/symbols/orange-symbol.svg` (original artwork)
@@ -123,15 +110,26 @@ Two planned improvements include:
 
 ## References
 
-Alchemist Simulator. 2020. Steam Store. https://store.steampowered.com/app/1105040/Alchemist_Simulator/
-Potion Craft Game Review. 2023. Immortal Wordsmith. https://www.immortalwordsmith.co.uk/potion-craft-game-review/
-Potion Craft: Alchemist Simulator. 2022. Video game published by tinyBuild. https://store.steampowered.com/app/1210320/Potion_Craft_Alchemist_Simulator/
-Potion Punch 2+. 2022. Monstronauts. https://www.monstronauts.com/all-stories/potion-punch-2-plus-apple-arcade/
-Potionomics. 2022. Steam Store. https://store.steampowered.com/app/1874490/Potionomics/
-Stardew Valley. 2016. Steam Store. https://store.steampowered.com/app/413150/Stardew_Valley/
-Strange Horticulture. 2022. Steam Store. https://store.steampowered.com/app/1574580/
-Stardew Valley 2024 Review. 2024. The Nocturnal Rambler Blog. https://thenocturnalrambler.blogspot.com/2024/06/stardew-valley-2024-review.htmlStrange_Horticulture/
-Tunetank. 2025. Medieval Happy Music. Pixabay. Retrieved March 12, 2026 from https://pixabay.com/music/adventure-medieval-happy-music-412790/
-Water Sort Puzzle. 2020. Mobile puzzle game listing on Apple App Store. https://apps.apple.com/us/app/magic-potion-sort-puzzle/id6755454821
+[1] Alchemist Simulator. 2020. Steam Store. https://store.steampowered.com/app/1105040/Alchemist_Simulator/
 
----
+[2] Flat Icon. Envelope free icon. https://www.flaticon.com/free-icon/envelope_2493541
+
+[3] Freepik. Blank beige notepaper design vector. https://www.freepik.com/free-vector/blank-beige-notepaper-design-vector_28428625.htm
+
+[2] Potion Craft Game Review. 2023. Immortal Wordsmith. https://www.immortalwordsmith.co.uk/potion-craft-game-review/
+
+[3] Potion Craft: Alchemist Simulator. 2022. Video game published by tinyBuild. https://store.steampowered.com/app/1210320/Potion_Craft_Alchemist_Simulator/
+
+[4] Potion Punch 2+. 2022. Monstronauts. https://www.monstronauts.com/all-stories/potion-punch-2-plus-apple-arcade/
+
+[5] Potionomics. 2022. Steam Store. https://store.steampowered.com/app/1874490/Potionomics/
+
+[6] Stardew Valley. 2016. Steam Store. https://store.steampowered.com/app/413150/Stardew_Valley/
+
+[7] Strange Horticulture. 2022. Steam Store. https://store.steampowered.com/app/1574580/
+
+[8] Stardew Valley 2024 Review. 2024. The Nocturnal Rambler Blog. https://thenocturnalrambler.blogspot.com/2024/06/stardew-valley-2024-review.htmlStrange_Horticulture/
+
+[9] Tunetank. 2025. Medieval Happy Music. Pixabay. Retrieved March 12, 2026 from https://pixabay.com/music/adventure-medieval-happy-music-412790/
+
+[10] Water Sort Puzzle. 2020. Mobile puzzle game listing on Apple App Store. https://apps.apple.com/us/app/magic-potion-sort-puzzle/id6755454821

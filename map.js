@@ -84,7 +84,7 @@ function drawMap() {
     text(
       `A/D: left/right  W/X: up/down  Q/E: smaller/larger\nrelX: ${level1RelX.toFixed(3)}  relY: ${level1RelY.toFixed(3)}  relD: ${level1RelDiameter.toFixed(3)}`,
       24,
-      height - boxH - 8
+      height - boxH - 8,
     );
     pop();
   }
@@ -178,9 +178,13 @@ function mapKeyPressed() {
       try {
         localStorage.setItem(
           "level1Hit",
-          JSON.stringify({ level1RelX, level1RelY, level1RelDiameter })
+          JSON.stringify({ level1RelX, level1RelY, level1RelDiameter }),
         );
-        console.log("Saved level1 hit values", { level1RelX, level1RelY, level1RelDiameter });
+        console.log("Saved level1 hit values", {
+          level1RelX,
+          level1RelY,
+          level1RelDiameter,
+        });
       } catch (e) {}
     }
     // Load values (L)
