@@ -138,53 +138,6 @@ function drawMap() {
       adjustedMY <= squareBottom;
   }
 
-  // Debug: draw the hit area so we can visually tune it
-  if (SHOW_HIT_AREAS) {
-    push();
-    noFill();
-    stroke(255, 0, 0, 180);
-    strokeWeight(2 / scaleFactor); // keep visible across scales
-    if (currentLevelNumber === 1) {
-      // Circle for Level 1
-      const levelDiameter = mapIconWidth * currentRelDiameter;
-      ellipseMode(CENTER);
-      ellipse(levelX, levelY, levelDiameter, levelDiameter);
-      fill(255, 0, 0, 200);
-      noStroke();
-      const centerSize = 6 / scaleFactor;
-      ellipse(levelX, levelY, centerSize, centerSize);
-    } else {
-      // Rectangle or Square for Level 2+
-      rectMode(CENTER);
-      rect(levelX, levelY, hitboxW, hitboxH, 10);
-    }
-    pop();
-  }
-  // Debug overlay with current params (screen coords)
-  if (SHOW_HIT_AREAS) {
-    push();
-    noStroke();
-    fill(0, 0, 0, 140);
-    let debugText = "";
-    let boxH = 70;
-
-    if (currentLevelNumber === 1) {
-      boxH = 90;
-      debugText = `LEVEL 1 (Circle)\nA/D: left/right  W/X: up/down  Q/E: smaller/larger\nrelX: ${currentRelX.toFixed(3)}  relY: ${currentRelY.toFixed(3)}  relD: ${currentRelDiameter.toFixed(3)}`;
-    } else {
-      boxH = 70;
-      debugText = `LEVEL ${currentLevelNumber} (${currentLevelNumber === 2 ? "Rectangle" : "Square"})\nOffset: (${hitboxOffsetX}, ${hitboxOffsetY})  Size: ${hitboxW}x${hitboxH}`;
-    }
-
-    const boxW = 380;
-    rect(16, height - boxH - 16, boxW, boxH, 8);
-    fill(255);
-    textAlign(LEFT, TOP);
-    textSize(12);
-    text(debugText, 24, height - boxH - 8);
-    pop();
-  }
-
   // Update fade animation based on hover state
   if (isHovering) {
     mapIconHoverFade = min(mapIconHoverFade + MAP_ICON_FADE_SPEED, 1);
@@ -214,7 +167,51 @@ function drawMap() {
   textAlign(CENTER, CENTER);
   text("Alchemy Map", BASE_W / 2, BASE_H * 0.14);
 
+  // Debug: draw the hit area on top of the map so it stays visible.
+  if (SHOW_HIT_AREAS) {
+    push();
+    noFill();
+    stroke(255, 0, 0, 180);
+    strokeWeight(2 / scaleFactor);
+    if (currentLevelNumber === 1) {
+      const levelDiameter = mapIconWidth * currentRelDiameter;
+      ellipseMode(CENTER);
+      ellipse(levelX, levelY, levelDiameter, levelDiameter);
+      fill(255, 0, 0, 200);
+      noStroke();
+      const centerSize = 6 / scaleFactor;
+      ellipse(levelX, levelY, centerSize, centerSize);
+    } else {
+      rectMode(CENTER);
+      rect(levelX, levelY, hitboxW, hitboxH, 10);
+    }
+    pop();
+  }
+
   pop();
+
+  if (SHOW_HIT_AREAS) {
+    push();
+    noStroke();
+    fill(0, 0, 0, 160);
+    let debugText = "";
+    let boxH = 86;
+
+    if (currentLevelNumber === 1) {
+      boxH = 104;
+      debugText = `LEVEL 1 (Circle)\nJ/L: left/right  I/K: up/down  N/M: smaller/larger\nH: toggle  P: save  O: load\nrelX: ${level1RelX.toFixed(3)}  relY: ${level1RelY.toFixed(3)}  relD: ${level1RelDiameter.toFixed(3)}`;
+    } else {
+      debugText = `LEVEL ${currentLevelNumber} (${currentLevelNumber === 2 ? "Rectangle" : "Square"})\nH: toggle overlay\nOffset: (${hitboxOffsetX}, ${hitboxOffsetY})  Size: ${hitboxW}x${hitboxH}`;
+    }
+
+    const boxW = 430;
+    rect(16, height - boxH - 16, boxW, boxH, 8);
+    fill(255);
+    textAlign(LEFT, TOP);
+    textSize(12);
+    text(debugText, 24, height - boxH - 8);
+    pop();
+  }
 
   if (isHovering) cursor(HAND);
   else cursor(ARROW);
@@ -228,6 +225,71 @@ function mapMousePressed() {
   // Create a fresh level instance and transition to gameplay
   createLevelInstance();
   currentScreen = "level";
+}
+
+function handleMapDebugShortcut() {
+  const lowerKey = key.toLowerCase();
+
+  if (lowerKey === "h") {
+    SHOW_HIT_AREAS = !SHOW_HIT_AREAS;
+    currentScreen = "map";
+    return true;
+  }
+
+  if (currentScreen !== "map" || !SHOW_HIT_AREAS) return false;
+
+  if (lowerKey === "j") {
+    level1RelX -= 0.005;
+    return true;
+  }
+  if (lowerKey === "l") {
+    level1RelX += 0.005;
+    return true;
+  }
+  if (lowerKey === "i") {
+    level1RelY -= 0.005;
+    return true;
+  }
+  if (lowerKey === "k") {
+    level1RelY += 0.005;
+    return true;
+  }
+  if (lowerKey === "n") {
+    level1RelDiameter = max(0.01, level1RelDiameter - 0.005);
+    return true;
+  }
+  if (lowerKey === "m") {
+    level1RelDiameter = min(0.8, level1RelDiameter + 0.005);
+    return true;
+  }
+  if (lowerKey === "p") {
+    try {
+      localStorage.setItem(
+        "level1Hit",
+        JSON.stringify({ level1RelX, level1RelY, level1RelDiameter }),
+      );
+      console.log("Saved level1 hit values", {
+        level1RelX,
+        level1RelY,
+        level1RelDiameter,
+      });
+    } catch (e) {}
+    return true;
+  }
+  if (lowerKey === "o") {
+    try {
+      const raw = localStorage.getItem("level1Hit");
+      if (raw) {
+        const obj = JSON.parse(raw);
+        level1RelX = obj.level1RelX;
+        level1RelY = obj.level1RelY;
+        level1RelDiameter = obj.level1RelDiameter;
+      }
+    } catch (e) {}
+    return true;
+  }
+
+  return false;
 }
 
 // ------------------------------------------------------------
@@ -245,60 +307,7 @@ function mapKeyPressed() {
     currentScreen = "start";
   }
 
-  // Debug: adjust Level1 hit area when toggle enabled
-  if (SHOW_HIT_AREAS) {
-    // Move left/right
-    if (key === "a" || key === "A") {
-      level1RelX -= 0.005;
-    }
-    if (key === "d" || key === "D") {
-      level1RelX += 0.005;
-    }
-    // Move up/down (remember relY positive is down)
-    if (key === "w" || key === "W") {
-      level1RelY -= 0.005;
-    }
-    if (key === "x" || key === "X") {
-      level1RelY += 0.005;
-    }
-    // Diameter adjust
-    if (key === "q" || key === "Q") {
-      level1RelDiameter = max(0.01, level1RelDiameter - 0.005);
-    }
-    if (key === "e" || key === "E") {
-      level1RelDiameter = min(0.8, level1RelDiameter + 0.005);
-    }
-    // Toggle debug overlay with D
-    if (key === "d" || key === "D") {
-      SHOW_HIT_AREAS = !SHOW_HIT_AREAS;
-    }
-    // Save current values to localStorage for convenience (press P)
-    if (key === "p" || key === "P") {
-      try {
-        localStorage.setItem(
-          "level1Hit",
-          JSON.stringify({ level1RelX, level1RelY, level1RelDiameter }),
-        );
-        console.log("Saved level1 hit values", {
-          level1RelX,
-          level1RelY,
-          level1RelDiameter,
-        });
-      } catch (e) {}
-    }
-    // Load values (L)
-    if (key === "l" || key === "L") {
-      try {
-        const raw = localStorage.getItem("level1Hit");
-        if (raw) {
-          const obj = JSON.parse(raw);
-          level1RelX = obj.level1RelX;
-          level1RelY = obj.level1RelY;
-          level1RelDiameter = obj.level1RelDiameter;
-        }
-      } catch (e) {}
-    }
-  }
+  if (handleMapDebugShortcut()) return;
 
   // ESC to return disabled temporarily
 }

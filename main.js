@@ -82,8 +82,8 @@ function preload() {
   bottleLightpurple = loadImage("assets/vials/closed-lightpurple.svg");
   bottleLightred = loadImage("assets/vials/closed-lightred.svg");
   bottleMidblue = loadImage("assets/vials/closed-midblue.svg");
-  bottleClosedOrange = loadImage("assets/vials/closed-lightorange.svg");
-  bottleOrange2 = loadImage("assets/vials/closed-lightorange2.svg");
+  bottleClosedOrange = loadImage("assets/vials/closed-orange.svg");
+  bottleOrange2 = loadImage("assets/vials/closed-orange2.svg");
   bottleTeal = loadImage("assets/vials/closed-teal.svg");
   bottleYellow = loadImage("assets/vials/closed-yellow.svg");
   bottleYellow2 = loadImage("assets/vials/closed-yellow2.svg");
@@ -221,6 +221,59 @@ function createLevelInstance() {
   levelInstance.assets.symbolYellow2 = symbolYellow2;
 }
 
+function jumpToLevel(levelNumber) {
+  currentLevelNumber = levelNumber;
+  createLevelInstance();
+  currentScreen = "level";
+}
+
+function jumpToLevelResult(levelNumber, resultType) {
+  jumpToLevel(levelNumber);
+  levelInstance.levelResult = resultType;
+
+  if (typeof Results !== "undefined") {
+    Results.reset();
+  }
+}
+
+function jumpToLevel2SecondRecipe() {
+  jumpToLevel(2);
+
+  levelInstance.orderStarted = true;
+  levelInstance.hasUnreadOrder = false;
+  levelInstance.currentSequenceIndex = 0;
+  levelInstance.completedSequences = [];
+  levelInstance.sequenceResultsToDisplay = [];
+  levelInstance.addedIngredients = [];
+  levelInstance.crystalAdded = false;
+}
+
+function handleGlobalDebugShortcut() {
+  if (key === "0") {
+    jumpToLevel2SecondRecipe();
+    return true;
+  }
+
+  if (key === "1" || key === "2") {
+    jumpToLevel(Number(key));
+    return true;
+  }
+
+  const shortcut = {
+    a: { levelNumber: 1, resultType: "CORRECT" },
+    b: { levelNumber: 1, resultType: "WRONG" },
+    c: { levelNumber: 1, resultType: "TIMEOUT" },
+    d: { levelNumber: 2, resultType: "CORRECT" },
+    e: { levelNumber: 2, resultType: "WRONG" },
+    f: { levelNumber: 2, resultType: "TIMEOUT" },
+  }[key.toLowerCase()];
+
+  if (!shortcut) return false;
+
+  jumpToLevelResult(shortcut.levelNumber, shortcut.resultType);
+  return true;
+}
+
 // setup() runs ONCE at the beginning
 // ------------------------------
 // This is where you usually set canvas size and initial settings.
@@ -275,6 +328,17 @@ function mousePressed() {
 // ------------------------------
 // This routes keyboard input to the correct screen handler.
 function keyPressed() {
+  if (handleGlobalDebugShortcut()) {
+    return;
+  }
+
+  if (
+    typeof handleMapDebugShortcut === "function" &&
+    handleMapDebugShortcut()
+  ) {
+    return;
+  }
+
   // Each screen *may* define a key handler:
   // start.js         → startKeyPressed()
   // instructions.js  → instrKeyPressed()

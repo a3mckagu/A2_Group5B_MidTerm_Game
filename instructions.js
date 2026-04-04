@@ -420,8 +420,7 @@ function instrMousePressed() {
 // Keyboard input
 // ------------------------------
 function instrKeyPressed() {
-  // ESC to return disabled temporarily; keep 'b' / 'B' shortcut
-  if (key === "b" || key === "B") {
+  if (keyCode === ESCAPE) {
     currentScreen = "start";
   }
 }

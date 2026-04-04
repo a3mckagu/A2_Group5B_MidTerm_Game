@@ -114,8 +114,7 @@ const Results = {
 
     // ── Banner dimensions ──
     const BW = 580; // banner width
-    // Banner height varies by result type: CORRECT has one button (shorter), others have two buttons (taller)
-    const BH = type === "CORRECT" ? 320 : 420; // banner height (body only, excluding rod)
+    const BH = type === "CORRECT" ? 320 : 368; // banner height (body only, excluding rod)
     const ROD_H = 18;
     const ROD_Y = 20; // rod centre Y (from banner top)
     const BODY_TOP = ROD_Y + 12; // where fabric starts
@@ -214,14 +213,12 @@ const Results = {
     push();
     noStroke();
     fill(trimCol);
-    // body rect
-    rectMode(CORNER);
-    rect(bx, BODY_TOP, BW, BH);
-    // pointed bottom
     beginShape();
-    vertex(bx, BODY_TOP + BH);
-    vertex(bx + BW, BODY_TOP + BH);
-    vertex(cx, BODY_TOP + BH + POINT_H);
+    vertex(bx, BODY_TOP); // top-left
+    vertex(bx + BW, BODY_TOP); // top-right
+    vertex(bx + BW, BODY_TOP + BH); // bottom-right
+    vertex(cx, BODY_TOP + BH + POINT_H); // bottom point
+    vertex(bx, BODY_TOP + BH); // bottom-left
     endShape(CLOSE);
     pop();
 
@@ -340,8 +337,6 @@ const Results = {
   }) {
     const alpha = textFade * 255;
     const textAreaTop = BODY_TOP + 36;
-    const textAreaBottom = BODY_TOP + BH - 16;
-    const textAreaH = textAreaBottom - textAreaTop;
 
     push();
     textAlign(CENTER, TOP);
@@ -351,7 +346,7 @@ const Results = {
     textSize(46);
     fill(red(trimCol), green(trimCol), blue(trimCol), alpha);
     noStroke();
-    let y = textAreaTop + textAreaH * 0.03;
+    let y = textAreaTop + 8;
     text(headingText, cx, y);
 
     // ── Status ── (use gold trim color)
@@ -397,6 +392,8 @@ const Results = {
     const btnW = 200;
     const btnH = 36;
     const btnPadding = 15;
+    const attributionToButtonGap = 44;
+    const bottomButtonMargin = 38;
 
     // Determine which buttons to show based on result type
     const showPlayAgain = resultType !== "CORRECT";
@@ -404,13 +401,12 @@ const Results = {
 
     // Calculate button positions
     let btnY1, btnY2;
+    const firstButtonY = y + attributionToButtonGap;
     if (showPlayAgain && showBackToMap) {
-      // Two buttons: stacked vertically with padding
-      btnY2 = textAreaBottom - btnH - 8; // bottom button (Back To Map)
-      btnY1 = btnY2 - btnH - btnPadding; // top button (Play Again / Try Again)
+      btnY1 = firstButtonY;
+      btnY2 = BODY_TOP + BH - bottomButtonMargin - btnH;
     } else if (showBackToMap) {
-      // Only Back To Map, centered
-      btnY2 = textAreaBottom - btnH - 8;
+      btnY2 = BODY_TOP + BH - bottomButtonMargin - btnH;
     }
 
     const btnX = cx - btnW / 2;

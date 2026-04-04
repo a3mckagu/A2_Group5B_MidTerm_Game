@@ -128,13 +128,17 @@ class Level {
         symbol: assets.blueSymbol,
         colour: "teal",
       },
-      {
-        id: "yellow",
-        img: assets.bottleYellow,
-        openImg: assets.bottleOpenYellow,
-        symbol: assets.orangeSymbol,
-        colour: "yellow",
-      },
+      ...(this.levelNumber === 2
+        ? []
+        : [
+            {
+              id: "yellow",
+              img: assets.bottleYellow,
+              openImg: assets.bottleOpenYellow,
+              symbol: assets.orangeSymbol,
+              colour: "yellow",
+            },
+          ]),
       // Level 2+ only: additional row of 4 vials
       ...(this.levelNumber > 1
         ? [
@@ -171,13 +175,17 @@ class Level {
       // Level 2+ only: additional vials (Level 2 shares these with Level 3)
       ...(this.levelNumber > 1
         ? [
-            {
-              id: "black2",
-              img: assets.bottleBlack2,
-              openImg: assets.bottleOpenBlack2,
-              symbol: assets.greenSymbol,
-              colour: "black2",
-            },
+            ...(this.levelNumber === 2
+              ? []
+              : [
+                  {
+                    id: "black2",
+                    img: assets.bottleBlack2,
+                    openImg: assets.bottleOpenBlack2,
+                    symbol: assets.greenSymbol,
+                    colour: "black2",
+                  },
+                ]),
             {
               id: "darkgreen2",
               img: assets.bottleDarkgreen2,
@@ -346,7 +354,7 @@ class Level {
     // --- SEQUENCE TRACKING ---
     this.addedIngredients = [];
     // Level 1: only 3 vials (id: lightgreen, midblue, lightred)
-    // Level 2: TWO sequences - first is lightpink2, lightorange, black, yellow2; second is lightgreen, midblue, black, lightpurple, lightred
+    // Level 2: single Sparks Fly recipe using the 5-symbol sequence
     // Level 3+: lightgreen, midblue, black, lightpurple, lightred
     if (this.levelNumber === 1) {
       this.correctOrder = [
@@ -358,27 +366,16 @@ class Level {
       this.currentSequenceIndex = 0;
       this.completedSequences = [];
     } else if (this.levelNumber === 2) {
-      // Level 2 has TWO sequences that must both be completed
-      this.sequences = [
-        // First sequence: Level 2 vials
-        [
-          assets.bottleLightpink2,
-          assets.bottleOrange2,
-          assets.bottleBlack,
-          assets.bottleYellow2,
-        ],
-        // Second sequence: Level 3 vials
-        [
-          assets.bottleLightgreen,
-          assets.bottleMidblue,
-          assets.bottleBlack,
-          assets.bottleLightpurple,
-          assets.bottleLightred,
-        ],
+      this.correctOrder = [
+        assets.bottleLightgreen,
+        assets.bottleMidblue,
+        assets.bottleBlack,
+        assets.bottleLightpurple,
+        assets.bottleLightred,
       ];
-      this.correctOrder = null; // Level 2 uses sequences array
-      this.currentSequenceIndex = 0; // Start with first sequence
-      this.completedSequences = [false, false]; // Track completion of each sequence
+      this.sequences = null;
+      this.currentSequenceIndex = 0;
+      this.completedSequences = [];
     } else {
       this.correctOrder = [
         assets.bottleLightgreen,
@@ -400,6 +397,45 @@ class Level {
     this.dropZone = { x: layout.cauldron.x, y: layout.cauldron.y - 220, r: 26 };
     this.recipeBookLift = 0; // persistent lift for smooth hover animation
     this.orderScrollOffset = 0; // scroll position for order cards container
+  }
+
+  _shuffleArray(arr) {
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const tmp = arr[i];
+      arr[i] = arr[j];
+      arr[j] = tmp;
+    }
+  }
+
+  _reshuffleShelfVials() {
+    const shelfVials = this.vials.filter((vial) => !vial.isCrystal);
+    if (!shelfVials.length) return;
+
+    this._shuffleArray(shelfVials);
+
+    const maxPerRow = 4;
+    const rowHeight = Math.max(...shelfVials.map((vial) => vial.height));
+    const rowGap = layout.shelf.rowSpacing || 20;
+
+    shelfVials.forEach((vial, idx) => {
+      const row = Math.floor(idx / maxPerRow);
+      const col = idx % maxPerRow;
+      const x = layout.shelf.x + col * layout.shelf.spacing;
+      const y =
+        layout.shelf.y +
+        row * (rowHeight + rowGap) +
+        (rowHeight - vial.height) / 2;
+
+      vial.x = x;
+      vial.y = y;
+      vial.startX = x;
+      vial.startY = y;
+    });
+
+    const crystalVials = this.vials.filter((vial) => vial.isCrystal);
+    this.vials = [...shelfVials, ...crystalVials];
+    this.bottles = this.vials;
   }
 
   checkSequence() {
@@ -501,7 +537,11 @@ class Level {
     // If the recipe book is open, render the focused recipe screen here and
     // return early so no gameplay elements are drawn or interactable.
     if (this.isRecipeOpen) {
-      this._drawRecipeBookOpen();
+      if (this.orderStarted) {
+        this._drawRecipeBookOpen();
+      } else {
+        this._drawRecipeBookLocked();
+      }
       return;
     }
 
@@ -553,24 +593,28 @@ class Level {
       const sheetLeft = o.x - sheetWidth / 2;
       const sheetTop = o.y - sheetHeight / 2;
       const padding = 30;
+      const wallOrderTitle =
+        this.levelNumber === 2 ? "Sparks Fly" : "Beginner's Luck";
+      const wallOrderSender =
+        this.levelNumber === 2 ? "From: Lady Beaumont" : "From: Lord Alistair";
 
-      // "Beginner's Luck" heading
+      // Active order heading
       push();
       textAlign(LEFT, TOP);
       textFont("Manufacturing Consent");
       textSize(32);
       fill("#2D0900");
-      text("Beginner's Luck", sheetLeft + padding, sheetTop + padding + 10);
+      text(wallOrderTitle, sheetLeft + padding, sheetTop + padding + 10);
       pop();
 
-      // "From: Lord Alistair"
+      // Active order sender
       push();
       textAlign(LEFT, TOP);
       textFont("IM Fell English");
       textStyle(ITALIC);
       textSize(18);
       fill("#6E6E6E");
-      text("From: Lord Alistair", sheetLeft + padding, sheetTop + padding + 50);
+      text(wallOrderSender, sheetLeft + padding, sheetTop + padding + 50);
       pop();
 
       // Patience section
@@ -664,7 +708,20 @@ class Level {
     const c = layout.cauldron;
     const cHeight =
       (this.assets.cauldronImg.height / this.assets.cauldronImg.width) * c.w;
+    const crystalCompletionY = c.y - cHeight * 0.12;
     image(this.assets.cauldronImg, c.x, c.y, c.w, cHeight);
+
+    // Debug marker for the Y position where the crystal completes its drop.
+    // push();
+    // stroke(255, 60, 60, 220);
+    // strokeWeight(2);
+    // line(
+    //   c.x - c.w * 0.22,
+    //   crystalCompletionY,
+    //   c.x + c.w * 0.22,
+    //   crystalCompletionY,
+    // );
+    // pop();
 
     // Overlay cauldron glow image on top of default cauldron
     if (this.assets.cauldronImgGlow) {
@@ -756,7 +813,11 @@ class Level {
       r.w;
 
     if (this.isRecipeOpen) {
-      this._drawRecipeBookOpen();
+      if (this.orderStarted) {
+        this._drawRecipeBookOpen();
+      } else {
+        this._drawRecipeBookLocked();
+      }
       return;
     }
 
@@ -769,7 +830,13 @@ class Level {
     // Draw closed book with smooth hover lift (visual only; click area unchanged)
     let desiredLift = 0;
     // Don't lift the book while interacting with a vial/crystal or when paused
-    if (!paused && !anyVialHeld && !anyVialActive && !this.crystalAdded) {
+    if (
+      !paused &&
+      !this.isOrderOpen &&
+      !anyVialHeld &&
+      !anyVialActive &&
+      !this.crystalAdded
+    ) {
       const { scaleFactor, offsetX, offsetY } = getScaleAndOffset();
       const adjustedMX = (mouseX - offsetX) / scaleFactor;
       const adjustedMY = (mouseY - offsetY) / scaleFactor;
@@ -915,6 +982,7 @@ class Level {
         const isHoverV =
           !vial.isHeld &&
           !vial.isMoving &&
+          !this.isOrderOpen &&
           !anyVialHeld && // suppress other vial hover while one is held
           !anyVialActive && // suppress hover while any vial is active (pouring)
           adjustedMX_v > vial.x - halfW_v &&
@@ -940,13 +1008,33 @@ class Level {
               (this.assets.cauldronImg.height / this.assets.cauldronImg.width) *
               layout.cauldron.w;
             const pauseY = layout.cauldron.y - cauldronHeight / 2 - 90;
-            const finalY = layout.cauldron.y + cauldronHeight / 4;
+            const originalFinalY = layout.cauldron.y + cauldronHeight / 4;
+            const finalY = layout.cauldron.y - cauldronHeight * 0.12;
+            const crystalCompleteProgress =
+              0.6 +
+              0.4 *
+                (Math.abs(finalY - pauseY) / Math.abs(originalFinalY - pauseY));
 
             if (vial.droppedFromHeld) {
               // If crystal was dropped from the user's hand, fall straight down
               // from the visual pour X position; only interpolate Y towards finalY.
-              if (vial.progress < 1) {
-                const t = constrain(vial.progress, 0, 1);
+              const originalDroppedDistance = Math.abs(
+                originalFinalY - vial.pourY,
+              );
+              const currentDroppedDistance = Math.abs(finalY - vial.pourY);
+              const desiredDroppedTime =
+                100 * (currentDroppedDistance / originalDroppedDistance);
+              const droppedCrystalCompleteProgress =
+                desiredDroppedTime <= 50
+                  ? desiredDroppedTime * 0.012
+                  : 0.6 + (desiredDroppedTime - 50) * 0.008;
+
+              if (vial.progress < droppedCrystalCompleteProgress) {
+                const t = constrain(
+                  vial.progress / droppedCrystalCompleteProgress,
+                  0,
+                  1,
+                );
                 vial.x = vial.pourX; // keep X fixed at drop point
                 vial.y = lerp(vial.pourY, finalY, t);
               } else {
@@ -966,8 +1054,9 @@ class Level {
                 const t = vial.progress / 0.6;
                 vial.x = lerp(vial.startX, targetX, t);
                 vial.y = lerp(vial.startY, pauseY, t);
-              } else if (vial.progress < 1) {
-                const t = (vial.progress - 0.6) / 0.4;
+              } else if (vial.progress < crystalCompleteProgress) {
+                const t =
+                  (vial.progress - 0.6) / (crystalCompleteProgress - 0.6);
                 vial.x = targetX;
                 vial.y = lerp(pauseY, finalY, t);
               } else {
@@ -984,8 +1073,28 @@ class Level {
             }
           } else {
             // Regular bottle animation
+            const targetX = layout.cauldron.x - 20;
+            const targetY = layout.cauldron.y - 160;
+            const referenceReturnDistance = dist(
+              targetX,
+              targetY,
+              vial.startX,
+              vial.startY,
+            );
+
             if (vial.droppedFromHeld) {
               // New flow: pour in place, then return to shelf
+              const returnDistance = dist(
+                vial.pourX,
+                vial.pourY,
+                vial.startX,
+                vial.startY,
+              );
+              const returnDuration = max(
+                0.2,
+                returnDistance / max(referenceReturnDistance, 1),
+              );
+
               if (vial.progress < 1.5) {
                 // Pouring phase (tilting happens during this)
                 vial.x = vial.pourX;
@@ -994,9 +1103,13 @@ class Level {
                   this.addedIngredients.push(vial.closedImg);
                   console.log("Added ingredient:", vial.closedImg);
                 }
-              } else if (vial.progress < 2.5) {
+              } else if (vial.progress < 1.5 + returnDuration) {
                 // Return to shelf
-                const back = vial.progress - 1.5;
+                const back = constrain(
+                  (vial.progress - 1.5) / returnDuration,
+                  0,
+                  1,
+                );
                 vial.x = lerp(vial.pourX, vial.startX, back);
                 vial.y = lerp(vial.pourY, vial.startY, back);
               } else {
@@ -1014,9 +1127,6 @@ class Level {
               }
             } else {
               // Original flow: move to cauldron, pour, return to shelf
-              const targetX = layout.cauldron.x - 20;
-              const targetY = layout.cauldron.y - 160;
-
               if (vial.progress < 1) {
                 vial.x = lerp(vial.startX, targetX, vial.progress);
                 vial.y = lerp(vial.startY, targetY, vial.progress);
@@ -1470,8 +1580,7 @@ class Level {
 
       // Draw notification panel on right side under envelope
       const panelWidth = 350;
-      // Extend panel height for Level 2+ to fit multiple cards without scrolling
-      const panelHeight = this.levelNumber >= 2 ? 535 : 296;
+      const panelHeight = 296;
       const panelRight = env.x + env.w / 2;
       const panelTop = env.y + envHeight / 2 + 15;
       const panelLeft = panelRight - panelWidth;
@@ -1508,22 +1617,13 @@ class Level {
       const cardHeight = panelHeight - 75; // available viewport height for cards
 
       // Calculate how many cards are present
-      const numCards = this.levelNumber >= 2 ? 2 : 1;
+      const numCards = 1;
       const cardSpacing = 12;
 
-      // For Level 2+, divide available space among cards so they fit without scrolling
-      const singleCardHeight =
-        this.levelNumber >= 2
-          ? (cardHeight - cardSpacing * (numCards - 1)) / numCards
-          : cardHeight;
+      const singleCardHeight = cardHeight;
 
       // Calculate total content height based on level
       let totalContentHeight = singleCardHeight;
-
-      // Level 2 has an extra locked card
-      if (this.levelNumber === 2) {
-        totalContentHeight = singleCardHeight + cardSpacing + singleCardHeight;
-      }
 
       // Clamp scroll offset to valid range
       const maxScroll = Math.max(0, totalContentHeight - cardHeight);
@@ -1565,7 +1665,7 @@ class Level {
         text(orderTitle, cardLeft + 20, cardTop + 20 - this.orderScrollOffset);
         pop();
 
-        // "From: Lord Alistair"
+        // Sender line
         push();
         textAlign(LEFT, TOP);
         textFont("IM Fell English");
@@ -1573,7 +1673,9 @@ class Level {
         textSize(20);
         fill("#6E6E6E");
         text(
-          "From: Lord Alistair",
+          this.levelNumber === 2
+            ? "From: Lady Beaumont"
+            : "From: Lord Alistair",
           cardLeft + 20,
           cardTop + 65 - this.orderScrollOffset,
         );
@@ -1669,185 +1771,6 @@ class Level {
           startBtnY + startBtnHeight / 2,
         );
         pop();
-
-        // ---- SECOND CARD (LOCKED) - Level 2 only ----
-        if (this.levelNumber === 2) {
-          const card2Top =
-            cardTop + singleCardHeight + cardSpacing - this.orderScrollOffset;
-
-          // Second card background
-          push();
-          rectMode(CORNER);
-          fill("#F5E6D1");
-          noStroke();
-          rect(cardLeft, card2Top, cardWidth, singleCardHeight, 8);
-          pop();
-
-          // Card 2 heading
-          push();
-          textAlign(LEFT, TOP);
-          textFont("Manufacturing Consent");
-          textSize(36);
-          fill("#2D0900");
-          text("Next Order", cardLeft + 20, card2Top + 20);
-          pop();
-
-          // "From: Mystery"
-          push();
-          textAlign(LEFT, TOP);
-          textFont("IM Fell English");
-          textStyle(ITALIC);
-          textSize(20);
-          fill("#6E6E6E");
-          text("From: Mystery", cardLeft + 20, card2Top + 65);
-          pop();
-
-          // "Locked" button
-          const lockedBtnMargin = 20;
-          const lockedBtnWidth = cardWidth - lockedBtnMargin * 2;
-          const lockedBtnHeight = 42;
-          const lockedBtnX = cardLeft + lockedBtnMargin;
-          const lockedBtnY = card2Top + singleCardHeight - lockedBtnHeight - 15;
-
-          push();
-          rectMode(CORNER);
-          fill("#888888");
-          noStroke();
-          rect(lockedBtnX, lockedBtnY, lockedBtnWidth, lockedBtnHeight, 8);
-          pop();
-
-          // Lock emoji + "START ORDER" text
-          push();
-          textAlign(CENTER, CENTER);
-          textFont("VT323");
-          textSize(20);
-          fill("#FFF4E5");
-          text(
-            "🔒 START ORDER",
-            lockedBtnX + lockedBtnWidth / 2,
-            lockedBtnY + lockedBtnHeight / 2,
-          );
-          pop();
-        }
-      } else if (this.levelNumber === 2) {
-        // ---- WHEN ORDER STARTED on Level 2: Show only the locked card ----
-        const card2Top = cardTop - this.orderScrollOffset;
-
-        // Second card background
-        push();
-        rectMode(CORNER);
-        fill("#F5E6D1");
-        noStroke();
-        rect(cardLeft, card2Top, cardWidth, singleCardHeight, 8);
-        pop();
-
-        // Card 2 heading
-        push();
-        textAlign(LEFT, TOP);
-        textFont("Manufacturing Consent");
-        textSize(36);
-        fill("#2D0900");
-        text("Next Order", cardLeft + 20, card2Top + 20);
-        pop();
-
-        // "From: Mystery"
-        push();
-        textAlign(LEFT, TOP);
-        textFont("IM Fell English");
-        textStyle(ITALIC);
-        textSize(20);
-        fill("#6E6E6E");
-        text("From: Mystery", cardLeft + 20, card2Top + 65);
-        pop();
-
-        // "Locked" button
-        const lockedBtnMargin = 20;
-        const lockedBtnWidth = cardWidth - lockedBtnMargin * 2;
-        const lockedBtnHeight = 42;
-        const lockedBtnX = cardLeft + lockedBtnMargin;
-        const lockedBtnY = card2Top + singleCardHeight - lockedBtnHeight - 15;
-
-        push();
-        rectMode(CORNER);
-        fill("#888888");
-        noStroke();
-        rect(lockedBtnX, lockedBtnY, lockedBtnWidth, lockedBtnHeight, 8);
-        pop();
-
-        // Lock emoji + "START ORDER" text
-        push();
-        textAlign(CENTER, CENTER);
-        textFont("VT323");
-        textSize(20);
-        fill("#FFF4E5");
-        text(
-          "🔒 START ORDER",
-          lockedBtnX + lockedBtnWidth / 2,
-          lockedBtnY + lockedBtnHeight / 2,
-        );
-        pop();
-
-        // ---- COMPLETION CARDS FOR FINISHED SEQUENCES ----
-        if (this.sequenceResultsToDisplay.length > 0) {
-          this.sequenceResultsToDisplay.forEach((result, idx) => {
-            const completionCardTop =
-              cardTop +
-              singleCardHeight +
-              cardSpacing +
-              idx * (singleCardHeight + cardSpacing) -
-              this.orderScrollOffset;
-
-            // Get the sequence title and details
-            const sequenceTitles = [
-              "Beginner's Luck",
-              "Sparks Fly", // Second sequence title
-            ];
-            const sequenceFroms = ["From: Lord Alistair", "From: Mystery"];
-            const title = sequenceTitles[result.sequenceIndex] || "Order";
-            const from = sequenceFroms[result.sequenceIndex] || "From: Unknown";
-
-            // Color: light green for completed, light red for failed
-            const bgColor = result.isCorrect ? "#D4F1D4" : "#F5C8C8";
-            const statusText = result.isCorrect ? "COMPLETED" : "FAILED";
-            const statusColor = result.isCorrect ? "#2D5F2D" : "#8B0000";
-
-            // Card background
-            push();
-            rectMode(CORNER);
-            fill(bgColor);
-            noStroke();
-            rect(cardLeft, completionCardTop, cardWidth, singleCardHeight, 8);
-            pop();
-
-            // Status text (COMPLETED or FAILED) above the title
-            push();
-            textAlign(LEFT, TOP);
-            textFont("VT323");
-            textSize(14);
-            fill(statusColor);
-            text(statusText, cardLeft + 20, completionCardTop + 12);
-            pop();
-
-            // Card title
-            push();
-            textAlign(LEFT, TOP);
-            textFont("Manufacturing Consent");
-            textSize(32);
-            fill("#2D0900");
-            text(title, cardLeft + 20, completionCardTop + 30);
-            pop();
-
-            // "From:" info
-            push();
-            textAlign(LEFT, TOP);
-            textFont("IM Fell English");
-            textStyle(ITALIC);
-            textSize(16);
-            fill("#6E6E6E");
-            text(from, cardLeft + 20, completionCardTop + 75);
-            pop();
-          });
-        }
       } else {
         // ---- OTHER LEVELS (1, 3+) when order started ----
         push();
@@ -1964,6 +1887,84 @@ class Level {
   }
 
   // -------------------------------------------------------
+  // _drawRecipeBookLocked()
+  // Draws the locked recipe view shown before the player starts an order.
+  // -------------------------------------------------------
+  _drawRecipeBookLocked() {
+    const openBook = this.assets.recipeBookOpen;
+    const bookWidth = 600;
+    const bookHeight = (openBook.height / openBook.width) * bookWidth;
+    const bookLeft = BASE_WIDTH / 2 - bookWidth / 2;
+    const bookTop = BASE_HEIGHT / 2 - bookHeight / 2;
+    const leftPageCX = bookLeft + bookWidth * 0.25;
+    const leftPageL = bookLeft + 28;
+    const leftPageR = bookLeft + bookWidth / 2 - 24;
+    const leftPageW = leftPageR - leftPageL;
+
+    push();
+    noStroke();
+    textFont(FONT_IM_FELL_ENGLISH);
+    textStyle(ITALIC);
+    textSize(28);
+    textAlign(CENTER, TOP);
+    fill(55, 30, 10, 230);
+
+    const lockedMessage =
+      "The secrets of this book only reveal themselves to those with an order at hand.";
+    const words = lockedMessage.split(" ");
+    const wrapWidth = leftPageW * 0.86;
+    const lineHeight = 32;
+    let line = "";
+    let textY = bookTop + 100;
+
+    for (const word of words) {
+      const testLine = line ? `${line} ${word}` : word;
+      if (textWidth(testLine) > wrapWidth) {
+        text(line, leftPageCX, textY);
+        line = word;
+        textY += lineHeight;
+      } else {
+        line = testLine;
+      }
+    }
+
+    if (line) {
+      text(line, leftPageCX, textY);
+    }
+
+    this._drawRecipeBookCloseButton(bookLeft, bookTop, bookWidth);
+    pop();
+  }
+
+  _drawRecipeBookCloseButton(bookLeft, bookTop, bookWidth) {
+    const btnSize = 36;
+    const btnX = bookLeft + bookWidth - btnSize / 2 + 32;
+    const btnY = bookTop + btnSize / 2 - 26;
+
+    const {
+      scaleFactor: _sf,
+      offsetX: _ox,
+      offsetY: _oy,
+    } = getScaleAndOffset();
+    const adjustedMX_book = (mouseX - _ox) / _sf;
+    const adjustedMY_book = (mouseY - _oy) / _sf;
+    const isCloseBtnHovered =
+      adjustedMX_book > btnX - btnSize / 2 &&
+      adjustedMX_book < btnX + btnSize / 2 &&
+      adjustedMY_book > btnY - btnSize / 2 &&
+      adjustedMY_book < btnY + btnSize / 2;
+
+    rectMode(CENTER);
+    fill(isCloseBtnHovered ? "#E83030" : "#D00000");
+    noStroke();
+    rect(btnX, btnY, btnSize, btnSize, 5);
+    fill("#FFF4E5");
+    textAlign(CENTER, CENTER);
+    textSize(26);
+    text("×", btnX, btnY + 3);
+  }
+
+  // -------------------------------------------------------
   // _drawRecipeBookOpen()
   // Draws the open recipe book with the pentagon symbol diagram
   // on the right page. Called whenever isRecipeOpen is true.
@@ -1986,13 +1987,17 @@ class Level {
     const leftPageW = leftPageR - leftPageL; // usable text width
     const bookBottom = bookTop + bookHeight;
 
-    // — VOL. I —
+    // — VOL. I / VOL. II —
     noStroke();
     textFont(FONT_VT323);
     textSize(15);
     textAlign(CENTER, TOP);
     fill(96, 56, 19, 140);
-    text("VOL. I", leftPageCX, bookTop + 36);
+    text(
+      this.levelNumber === 2 ? "VOL. II" : "VOL. I",
+      leftPageCX,
+      bookTop + 36,
+    );
 
     // — Top ornamental rule + diamond —
     const ruleY1 = bookTop + 56;
@@ -2023,11 +2028,7 @@ class Level {
     textSize(30);
     textAlign(CENTER, TOP);
     fill(55, 30, 10);
-    // For level 2 second sequence, show level 3 recipe
-    const displayLevelForRecipe =
-      this.levelNumber === 2 && this.currentSequenceIndex === 1
-        ? 3
-        : this.levelNumber;
+    const displayLevelForRecipe = this.levelNumber === 2 ? 3 : this.levelNumber;
     const potionTitle =
       displayLevelForRecipe === 1 ? "Beginner's Luck" : "Sparks Fly";
     text(potionTitle, leftPageCX, bookTop + 66);
@@ -2117,64 +2118,33 @@ class Level {
 
     // Define vertices based on level
     // Level 1: Triangle with 3 vials
-    // Level 2 (first sequence): Square (diamond orientation) with 4 vials
-    // Level 2 (second sequence) / Level 3+: Pentagon with 5 vials
+    // Level 2 and Level 3+: Pentagon with 5 vials
     let vertices;
-    const squareRadius = 85; // distance from center to each corner for Level 2
-    const isLevel2FirstSequence =
-      this.levelNumber === 2 && this.currentSequenceIndex === 0;
     if (this.levelNumber === 1) {
-      // Triangle layout: bottom-left, bottom-right, top-center
+      // Triangle layout on the outer ring: bottom-left, bottom-right, top-center
+      const triangleRadius = RING_R;
       vertices = [
         {
-          x: 650 + SHIFT_X,
-          y: 350,
+          x: CX + Math.cos((5 * Math.PI) / 6) * triangleRadius,
+          y: CY + Math.sin((5 * Math.PI) / 6) * triangleRadius,
           img: this.assets.symbolLightgreen,
           label: "Begin here.",
         },
         {
-          x: 800 + SHIFT_X,
-          y: 350,
+          x: CX + Math.cos(Math.PI / 6) * triangleRadius,
+          y: CY + Math.sin(Math.PI / 6) * triangleRadius,
           img: this.assets.symbolMidblue,
           label: "Follows the first.",
         },
         {
-          x: 725 + SHIFT_X,
-          y: 200,
+          x: CX,
+          y: CY - triangleRadius,
           img: this.assets.symbolRed,
           label: "Last vial.",
         },
       ];
-    } else if (isLevel2FirstSequence) {
-      // Square (diamond) layout: 4 icons at cardinal points (Level 2 first sequence only)
-      vertices = [
-        {
-          x: CX,
-          y: CY + squareRadius,
-          img: this.assets.symbolLightpink2,
-          label: "Begin here.",
-        },
-        {
-          x: CX - squareRadius,
-          y: CY,
-          img: this.assets.symbolOrange2,
-          label: "After first.",
-        },
-        {
-          x: CX,
-          y: CY - squareRadius,
-          img: this.assets.symbolBlack,
-          label: "The anchor.",
-        },
-        {
-          x: CX + squareRadius,
-          y: CY,
-          img: this.assets.symbolYellow2,
-          label: "Final vial.",
-        },
-      ];
     } else {
-      // Pentagon layout: original 5 vials for level 2 (second sequence) and level 3+
+      // Pentagon layout for level 2 and level 3+
       vertices = [
         {
           x: 810 + SHIFT_X,
@@ -2211,16 +2181,14 @@ class Level {
 
     push();
 
-    // -- Outer and inner rings (only for pentagon/Level 3+ and Level 2 second sequence, not triangle or square or Level 2 first sequence) --
-    if (!(this.levelNumber === 1 || isLevel2FirstSequence)) {
-      noFill();
-      stroke(90, 55, 18, 46); // rgba(90,55,18,0.18) → alpha ~46
-      strokeWeight(1);
-      ellipseMode(CENTER);
-      circle(CX, CY, RING_R * 2);
-      stroke(90, 55, 18, 26);
-      circle(CX, CY, INNER_R * 2);
-    }
+    // -- Outer and inner rings --
+    noFill();
+    stroke(90, 55, 18, 46); // rgba(90,55,18,0.18) → alpha ~46
+    strokeWeight(1);
+    ellipseMode(CENTER);
+    circle(CX, CY, RING_R * 2);
+    stroke(90, 55, 18, 26);
+    circle(CX, CY, INNER_R * 2);
 
     // -- Polygon outline (triangle for level 1, square for level 2, pentagon for level 3+) --
     stroke(90, 55, 18, 28);
@@ -2230,13 +2198,11 @@ class Level {
     for (const v of vertices) vertex(v.x, v.y);
     endShape(CLOSE);
 
-    // -- Spokes from centroid to each vertex (only for pentagon/Level 3+ and Level 2 second sequence) --
-    if (!(this.levelNumber === 1 || isLevel2FirstSequence)) {
-      stroke(90, 55, 18, 18);
-      strokeWeight(0.8);
-      for (const v of vertices) {
-        line(CX, CY, v.x, v.y);
-      }
+    // -- Spokes from centroid to each vertex --
+    stroke(90, 55, 18, 18);
+    strokeWeight(0.8);
+    for (const v of vertices) {
+      line(CX, CY, v.x, v.y);
     }
 
     // -- Symbols (vial images) centred on each vertex --
@@ -2284,27 +2250,8 @@ class Level {
           } else {
             g.textAlign(CENTER, TOP);
           }
-        } else if (isLevel2FirstSequence) {
-          // Square (diamond) layout: labels positioned outside each symbol (Level 2 first sequence only)
-          if (v.label === "Begin here.") {
-            // Bottom symbol - label below
-            ly = v.y + offset + extraDown;
-            g.textAlign(CENTER, TOP);
-          } else if (v.label === "After first.") {
-            // Left symbol - label below
-            ly = v.y + offset + extraDown;
-            g.textAlign(CENTER, TOP);
-          } else if (v.label === "The anchor.") {
-            // Top symbol - label above
-            ly = v.y - offset;
-            g.textAlign(CENTER, BOTTOM);
-          } else if (v.label === "Final vial.") {
-            // Right symbol - label below
-            ly = v.y + offset + extraDown;
-            g.textAlign(CENTER, TOP);
-          }
         } else {
-          // Pentagon layout: "Nearly there." above, others below (Level 2 second sequence and Level 3+)
+          // Pentagon layout: "Nearly there." above, others below
           ly =
             v.label === "Nearly there."
               ? v.y - offset
@@ -2334,33 +2281,7 @@ class Level {
 
     // -- Close button (top-right corner of book) --
     // Larger close button for recipe screen (keeps same offsets)
-    const btnSize = 36;
-    // Shift slightly further beyond the inner margin to sit at the book's top-right
-    const btnX = bookLeft + bookWidth - btnSize / 2 + 32;
-    // Move a bit higher (closer to the top edge of the book)
-    const btnY = bookTop + btnSize / 2 - 26;
-
-    const {
-      scaleFactor: _sf,
-      offsetX: _ox,
-      offsetY: _oy,
-    } = getScaleAndOffset();
-    const adjustedMX_book = (mouseX - _ox) / _sf;
-    const adjustedMY_book = (mouseY - _oy) / _sf;
-    const isCloseBtnHovered =
-      adjustedMX_book > btnX - btnSize / 2 &&
-      adjustedMX_book < btnX + btnSize / 2 &&
-      adjustedMY_book > btnY - btnSize / 2 &&
-      adjustedMY_book < btnY + btnSize / 2;
-
-    rectMode(CENTER);
-    fill(isCloseBtnHovered ? "#E83030" : "#D00000");
-    noStroke();
-    rect(btnX, btnY, btnSize, btnSize, 5);
-    fill("#FFF4E5");
-    textAlign(CENTER, CENTER);
-    textSize(26);
-    text("×", btnX, btnY + 3);
+    this._drawRecipeBookCloseButton(bookLeft, bookTop, bookWidth);
 
     pop();
   }
@@ -2406,46 +2327,6 @@ function levelMousePressed() {
     Results.mousePressed(adjustedX, adjustedY);
     return;
   }
-
-  // Check if a bottle is currently being held
-  const heldVial = levelInstance.vials.find((v) => v.isHeld);
-
-  if (heldVial) {
-    // Click while holding = cancel and return to shelf
-    heldVial.isHeld = false;
-    heldVial.isSelected = false;
-    heldVial.x = heldVial.startX;
-    heldVial.y = heldVial.startY;
-    // restore closed appearance
-    heldVial.img = heldVial.closedImg;
-    heldVial.scale = 1.0;
-    heldVial.targetScale = 1.0;
-    return;
-  }
-
-  // Prevent picking up another vial while any vial is active (moving/pouring)
-  const anyVialActive = levelInstance.vials.some((v) => v.isMoving);
-  if (anyVialActive) return;
-
-  // No bottle held — try to pick one up by clicking on it
-  levelInstance.vials.forEach((vial) => {
-    if (
-      !vial.used &&
-      !vial.isMoving &&
-      adjustedX > vial.x - vial.width / 2 &&
-      adjustedX < vial.x + vial.width / 2 &&
-      adjustedY > vial.y - vial.height / 2 &&
-      adjustedY < vial.y + vial.height / 2
-    ) {
-      vial.isSelected = true;
-      vial.isHeld = true;
-      // swap to open asset and slightly enlarge while held
-      vial.img = vial.openImg || vial.closedImg;
-      vial.targetScale = vial.isCrystal ? 1.18 : 1.08;
-    } else {
-      vial.isSelected = false;
-    }
-  });
 
   // ---- Order Overlay Close Button ----
   if (levelInstance.isOrderOpen) {
@@ -2516,6 +2397,46 @@ function levelMousePressed() {
     return; // block clicks behind overlay
   }
 
+  // Check if a bottle is currently being held
+  const heldVial = levelInstance.vials.find((v) => v.isHeld);
+
+  if (heldVial) {
+    // Click while holding = cancel and return to shelf
+    heldVial.isHeld = false;
+    heldVial.isSelected = false;
+    heldVial.x = heldVial.startX;
+    heldVial.y = heldVial.startY;
+    // restore closed appearance
+    heldVial.img = heldVial.closedImg;
+    heldVial.scale = 1.0;
+    heldVial.targetScale = 1.0;
+    return;
+  }
+
+  // Prevent picking up another vial while any vial is active (moving/pouring)
+  const anyVialActive = levelInstance.vials.some((v) => v.isMoving);
+  if (anyVialActive) return;
+
+  // No bottle held — try to pick one up by clicking on it
+  levelInstance.vials.forEach((vial) => {
+    if (
+      !vial.used &&
+      !vial.isMoving &&
+      adjustedX > vial.x - vial.width / 2 &&
+      adjustedX < vial.x + vial.width / 2 &&
+      adjustedY > vial.y - vial.height / 2 &&
+      adjustedY < vial.y + vial.height / 2
+    ) {
+      vial.isSelected = true;
+      vial.isHeld = true;
+      // swap to open asset and slightly enlarge while held
+      vial.img = vial.openImg || vial.closedImg;
+      vial.targetScale = vial.isCrystal ? 1.18 : 1.08;
+    } else {
+      vial.isSelected = false;
+    }
+  });
+
   // ---- Envelope Icon Click ----
   const env = layout.envelope;
   const envHeight =
@@ -2551,6 +2472,9 @@ function levelMousePressed() {
       adjustedY < btnY + btnSize / 2
     ) {
       levelInstance.isRecipeOpen = false;
+      if (levelInstance.levelNumber >= 2) {
+        levelInstance._reshuffleShelfVials();
+      }
       return;
     }
     return; // block clicks behind overlay
@@ -2589,47 +2513,4 @@ function levelMouseWheel(e) {
 function levelKeyPressed() {
   // ESC return disabled temporarily
   if (!levelInstance) return;
-
-  // Debug keys: 1 = success, 2 = wrong, 3 = timeout
-  // Only allow CORRECT/WRONG debug triggers when the crystal has been added
-  // and (for CORRECT) the ingredient sequence matches.
-  if (key === "1") {
-    if (levelInstance.crystalAdded) {
-      // verify sequence is correct before forcing CORRECT
-      const isCorrect =
-        levelInstance.addedIngredients.length ===
-          levelInstance.correctOrder.length &&
-        levelInstance.correctOrder.every(
-          (b, i) => levelInstance.addedIngredients[i] === b,
-        );
-      if (isCorrect) {
-        levelInstance.levelResult = "CORRECT";
-        if (typeof Results !== "undefined") Results.reset();
-      }
-    }
-    return;
-  }
-  if (key === "2") {
-    if (levelInstance.crystalAdded) {
-      // only force WRONG if sequence isn't correct
-      const isCorrect =
-        levelInstance.addedIngredients.length ===
-          levelInstance.correctOrder.length &&
-        levelInstance.correctOrder.every(
-          (b, i) => levelInstance.addedIngredients[i] === b,
-        );
-      if (!isCorrect) {
-        levelInstance.levelResult = "WRONG";
-        if (typeof Results !== "undefined") Results.reset();
-      }
-    }
-    return;
-  }
-  if (key === "3") {
-    if (!levelInstance.crystalAdded) {
-      levelInstance.levelResult = "TIMEOUT";
-      if (typeof Results !== "undefined") Results.reset();
-    }
-    return;
-  }
 }
