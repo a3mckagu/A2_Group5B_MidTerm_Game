@@ -58,6 +58,24 @@ class Level {
     }
     this.assets = assets;
 
+    // Debug overlay settings: adjust the dim/background rectangle that appears
+    // behind the intro dialog. Values are pixel insets from each screen edge.
+    this.overlayDebug = {
+      enabled: true, // when true, overlay is drawn using these insets
+      // default insets leave a thin decorative border visible; slightly narrower
+      // insets make the black background wider as requested
+      left: 6,
+      top: 6,
+      right: 6,
+      bottom: 6,
+      alpha: 255,
+    };
+
+    // Flashlight mode: when active (Level 3 only), recipe screen is masked
+    // except for a circular area centered on the player's cursor. Radius in px.
+    this.flashlightActive = false;
+    this.flashlightRadius = 100;
+
     // ---- VIALS CONFIGURATION ----
     // Define all vials (regular bottles + crystal) with their properties
     const vialsConfig = [
@@ -354,18 +372,15 @@ class Level {
     this.showRecipeIntro = false; // runtime flag to display the intro modal
     this._recipeIntroBtn = null;
 
-    // Intro modal debug controls (interactive tuning)
-    this._introDebug = {
-      enabled: false,
-      dialogW: 520,
-      dialogH: 260,
-      alpha: 255,
-      xOffset: 0,
-      yOffset: 0,
-    };
-
     // Customer patience timer (starts when level first draws)
-    this.patienceDuration = 120000; // 2 minutes in ms
+    // Per-level durations:
+    // Level 1 -> 1.5 minutes (90,000 ms)
+    // Level 2 -> 2 minutes (120,000 ms) [default]
+    // Level 3 -> 3 minutes (180,000 ms)
+    if (this.levelNumber === 1) this.patienceDuration = 90000;
+    else if (this.levelNumber === 2) this.patienceDuration = 120000;
+    else if (this.levelNumber === 3) this.patienceDuration = 180000;
+    else this.patienceDuration = 120000;
     this.patienceStart = null; // set on first draw()
     this.patiencePaused = false;
     this.patienceElapsedAtPause = 0;
@@ -446,12 +461,18 @@ class Level {
       this.currentSequenceIndex = 0;
       this.completedSequences = [];
     } else {
+      // Level 3: explicit ordered steps including a mixing step which
+      // must be completed (mixMeterComplete) at the right time. Use the
+      // sentinel string 'MIX' to represent the required mix step.
       this.correctOrder = [
-        assets.bottleLightgreen,
-        assets.bottleMidblue,
-        assets.bottleBlack,
-        assets.bottleLightpurple,
-        assets.bottleLightred,
+        assets.bottleLightpink2, // 1. symbol-lightpink2
+        assets.bottleYellow2, // 2. symbol-yellow2
+        assets.bottleLightblue2, // 3. symbol-lightblue2
+        assets.bottleLightpink, // 4. symbol-lightpink
+        "MIX",
+        assets.bottleOrange2, // 5. symbol-orange2
+        assets.bottleDarkpurple, // 6. symbol-darkpurple
+        assets.bottleLightpurple2, // 7. symbol-lightpurple2
       ];
       this.sequences = null; // Level 3+ uses single sequence (correctOrder)
       this.currentSequenceIndex = 0;
@@ -647,7 +668,10 @@ class Level {
     if (this.showRecipeIntro) {
       push();
       // Compute the book bounding box so we can place the intro text/button inside it
-      const openBook = this.assets && this.assets.recipeBookOpen ? this.assets.recipeBookOpen : null;
+      const openBook =
+        this.assets && this.assets.recipeBookOpen
+          ? this.assets.recipeBookOpen
+          : null;
       const bookW = 600;
       const bookH = openBook ? (openBook.height / openBook.width) * bookW : 420;
       const bookLeft = BASE_WIDTH / 2 - bookW / 2;
@@ -659,39 +683,59 @@ class Level {
         image(this.assets.recipeBookBg, 0, 0, BASE_WIDTH, BASE_HEIGHT);
       }
 
-      // Dim the rest of the screen with a solid black overlay (alpha tunable)
+      // Draw overlay: either full-screen or using debug insets/alpha
+      const od = this.overlayDebug || {
+        left: 0,
+        top: 0,
+        right: 0,
+        bottom: 0,
+        alpha: 255,
+        enabled: true,
+      };
       noStroke();
-      fill(0, this._introDebug.alpha || 255);
       rectMode(CORNER);
-      rect(0, 0, BASE_WIDTH, BASE_HEIGHT);
-
+      if (od.enabled === false) {
+        // debug disabled → full black background
+        fill(0, od.alpha || 255);
+        rect(0, 0, BASE_WIDTH, BASE_HEIGHT);
+      } else {
+        // draw inset overlay according to debug values
+        const ox = od.left || 0;
+        const oy = od.top || 0;
+        const ow = BASE_WIDTH - (od.left || 0) - (od.right || 0);
+        const oh = BASE_HEIGHT - (od.top || 0) - (od.bottom || 0);
+        fill(0, od.alpha || 255);
+        rect(ox, oy, ow, oh);
+      }
 
       // Draw a centered dialog box (dark panel with gold border) matching the screenshot
-      // Use fixed defaults to match the screenshot exactly unless debug overrides are set
-      const dialogW = this._introDebug.dialogW || 384;
-      const dialogH = this._introDebug.dialogH || 236;
-      const dialogX = BASE_WIDTH / 2 - dialogW / 2 + (this._introDebug.xOffset || 0);
-      const dialogY = BASE_HEIGHT / 2 - dialogH / 2 + (this._introDebug.yOffset || 0);
+      const dialogW = 384;
+      const dialogH = 236;
+      const dialogX = BASE_WIDTH / 2 - dialogW / 2;
+      const dialogY = BASE_HEIGHT / 2 - dialogH / 2;
 
-      // Outer border (thicker gold outline)
-      stroke(212, 156, 63);
-      strokeWeight(4);
-      fill(36, 26, 22);
+      // Outer border
+      stroke(200, 150, 60);
+      strokeWeight(3);
+      fill(38, 28, 20);
       rectMode(CORNER);
-      rect(dialogX, dialogY, dialogW, dialogH, 12);
+      rect(dialogX, dialogY, dialogW, dialogH, 10);
 
-      // Slight inner panel to give depth and the dark inset
-      // Draw a subtle inner stroke then fill to mimic the screenshot
-      const innerPad = 10;
-      stroke(30, 22, 18);
-      strokeWeight(2);
-      fill(34, 24, 20);
-      rect(dialogX + innerPad, dialogY + innerPad, dialogW - innerPad * 2, dialogH - innerPad * 2, 8);
+      // Slight inner panel to give depth
       noStroke();
+      fill(30, 22, 18);
+      const innerPad = 12;
+      rect(
+        dialogX + innerPad,
+        dialogY + innerPad,
+        dialogW - innerPad * 2,
+        dialogH - innerPad * 2,
+        8,
+      );
 
       // Centered message inside the dialog
-      const cx = BASE_WIDTH / 2 + (this._introDebug.xOffset || 0);
-      let y = dialogY + dialogH * 0.28 + (this._introDebug.yOffset || 0);
+      const cx = BASE_WIDTH / 2;
+      let y = dialogY + dialogH * 0.34;
       textAlign(CENTER, CENTER);
       textFont(FONT_IM_FELL_ENGLISH);
       textStyle(ITALIC);
@@ -704,43 +748,41 @@ class Level {
       const btnW = 220;
       const btnH = 44;
       const btnX = cx - btnW / 2;
-      const btnY = dialogY + dialogH * 0.64;
+      const btnY = dialogY + dialogH * 0.62;
       this._recipeIntroBtn = { x: btnX, y: btnY, w: btnW, h: btnH };
 
-      // Button style and label
+      // Button style and label with hover state
       rectMode(CORNER);
-      fill(148, 110, 34);
+      // Convert mouse to BASE coordinates for hit testing
+      const {
+        scaleFactor: _sf_btn,
+        offsetX: _ox_btn,
+        offsetY: _oy_btn,
+      } = getScaleAndOffset();
+      const adjustedMX_btn = (mouseX - _ox_btn) / _sf_btn;
+      const adjustedMY_btn = (mouseY - _oy_btn) / _sf_btn;
+      const isBtnHovered =
+        adjustedMX_btn > btnX &&
+        adjustedMX_btn < btnX + btnW &&
+        adjustedMY_btn > btnY &&
+        adjustedMY_btn < btnY + btnH;
+
+      if (isBtnHovered) {
+        fill(162, 126, 50); // slightly lighter on hover (reduced brightness)
+        cursor(HAND);
+      } else {
+        fill(148, 110, 34);
+        cursor(ARROW);
+      }
       noStroke();
       rect(btnX, btnY, btnW, btnH, 8);
       textFont(FONT_VT323);
       textStyle(NORMAL);
       textSize(20);
       fill(255, 245, 220);
-      text("Very well.", cx, btnY + btnH / 2);
+      text("Very Well", cx, btnY + btnH / 2);
 
-      // Debug HUD: show dimensions and controls when enabled
-      if (this._introDebug.enabled) {
-        push();
-        rectMode(CORNER);
-        noStroke();
-        fill(0, 180);
-        rect(18, 18, 340, 120, 6);
-        fill(255);
-        textAlign(LEFT, TOP);
-        textFont(FONT_VT323);
-        textSize(14);
-        const lines = [
-          `DEBUG MODE: Intro modal`,
-          `Width: ${this._introDebug.dialogW}px  Height: ${this._introDebug.dialogH}px`,
-          `Alpha: ${this._introDebug.alpha}`,
-          `Arrows: change size  Shift+Arrows for larger steps`,
-          `R: reset  T: toggle debug`,
-        ];
-        for (let i = 0; i < lines.length; i++) {
-          text(lines[i], 28, 24 + i * 18);
-        }
-        pop();
-      }
+      // (interactive overlay debug HUD removed)
 
       pop();
       return;
@@ -966,10 +1008,18 @@ class Level {
       const sheetLeft = o.x - sheetWidth / 2;
       const sheetTop = o.y - sheetHeight / 2;
       const padding = 30;
-      const wallOrderTitle =
-        this.levelNumber === 2 ? "Sparks Fly" : "Beginner's Luck";
-      const wallOrderSender =
-        this.levelNumber === 2 ? "From: Lady Beaumont" : "From: Lord Alistair";
+      let wallOrderTitle;
+      let wallOrderSender;
+      if (this.levelNumber === 2) {
+        wallOrderTitle = "Sparks Fly";
+        wallOrderSender = "From: Lady Beaumont";
+      } else if (this.levelNumber === 3) {
+        wallOrderTitle = "Last Light";
+        wallOrderSender = "From: King Percival";
+      } else {
+        wallOrderTitle = "Beginner's Luck";
+        wallOrderSender = "From: Lord Alistair";
+      }
 
       // Active order heading
       push();
@@ -1026,12 +1076,18 @@ class Level {
       rect(barX + filledWFloat, barY, barWidth - filledWFloat, barHeight);
       pop();
 
-      // Segment lines
+      // Segment divider lines: vary by level so each segment equals 30s
+      // Level 1 -> 2 dividers (3 sections of 30s = 90s)
+      // Level 2 -> 3 dividers (4 sections of 30s = 120s) [default]
+      // Level 3 -> 5 dividers (6 sections of 30s = 180s)
       push();
       stroke("#6E6E6E");
       strokeWeight(1);
-      for (let i = 1; i < 4; i++) {
-        const lineX = barX + (barWidth / 4) * i;
+      let numDividers = 3; // default for level 2
+      if (this.levelNumber === 1) numDividers = 2;
+      else if (this.levelNumber === 3) numDividers = 5;
+      for (let i = 1; i <= numDividers; i++) {
+        const lineX = barX + (barWidth / (numDividers + 1)) * i;
         line(lineX, barY + 1, lineX, barY + barHeight - 1);
       }
       pop();
@@ -1400,8 +1456,8 @@ class Level {
               this.mixMeterComplete = true;
               if (this.mixSuccessShowFrame === null)
                 this.mixSuccessShowFrame = frameCount;
-              // If this is Level 2, mixing must occur as the specific step.
-              if (this.levelNumber === 2) {
+              // If this is Level 2 or Level 3, mixing must occur as the specific step.
+              if (this.levelNumber === 2 || this.levelNumber === 3) {
                 // Expected index for the MIX sentinel (0-based)
                 const expectedMixIndex = 4; // after 4 vials
                 // If player has not added exactly the 4 preceding vials,
@@ -1602,13 +1658,19 @@ class Level {
       // When mix is complete and the mouse is over the spoon, show a tooltip
       // instead of lifting the spoon. Tooltip appears above the spoon and
       // points to it with a small triangular pointer.
+      // Suppress the tooltip immediately after the automatic spoon return
+      // that occurs when the mix meter fills. Allow it at any later time.
+      const justAutoReturned =
+        this.mixSuccessShowFrame && frameCount - this.mixSuccessShowFrame < 100;
+
       const showAlreadyMixedTooltip =
         insideEllipse &&
         !this.spoonIsHeld &&
         this.mixMeterComplete &&
         !this.isOrderOpen &&
         !anyVialHeld &&
-        !anyVialActive;
+        !anyVialActive &&
+        !justAutoReturned;
 
       if (showAlreadyMixedTooltip) {
         push();
@@ -2531,8 +2593,10 @@ class Level {
         textFont("Manufacturing Consent");
         textSize(36);
         fill("#2D0900");
-        const orderTitle =
-          this.levelNumber === 2 ? "Sparks Fly" : "Beginner's Luck";
+        let orderTitle;
+        if (this.levelNumber === 2) orderTitle = "Sparks Fly";
+        else if (this.levelNumber === 3) orderTitle = "Last Light";
+        else orderTitle = "Beginner's Luck";
         text(orderTitle, cardLeft + 20, cardTop + 20 - this.orderScrollOffset);
         pop();
 
@@ -2543,13 +2607,13 @@ class Level {
         textStyle(ITALIC);
         textSize(20);
         fill("#6E6E6E");
-        text(
+        const senderText =
           this.levelNumber === 2
             ? "From: Lady Beaumont"
-            : "From: Lord Alistair",
-          cardLeft + 20,
-          cardTop + 65 - this.orderScrollOffset,
-        );
+            : this.levelNumber === 3
+              ? "From: King Percival"
+              : "From: Lord Alistair";
+        text(senderText, cardLeft + 20, cardTop + 65 - this.orderScrollOffset);
         pop();
 
         // Patience bar (above START ORDER button)
@@ -2600,12 +2664,18 @@ class Level {
         );
         pop();
 
-        // Increment lines (2 minutes = 120 seconds, lines every 30 seconds = 4 segments)
+        // Segment divider lines: vary by level so each segment equals 30s
+        // Level 1 -> 2 dividers (3 sections of 30s = 90s)
+        // Level 2 -> 3 dividers (4 sections of 30s = 120s) [default]
+        // Level 3 -> 5 dividers (6 sections of 30s = 180s)
         push();
         stroke("#6E6E6E");
         strokeWeight(1);
-        for (let i = 1; i < 4; i++) {
-          const lineX = barX + (startBtnWidth / 4) * i;
+        let numDividersPanel = 3; // default for level 2
+        if (this.levelNumber === 1) numDividersPanel = 2;
+        else if (this.levelNumber === 3) numDividersPanel = 5;
+        for (let i = 1; i <= numDividersPanel; i++) {
+          const lineX = barX + (startBtnWidth / (numDividersPanel + 1)) * i;
           line(lineX, barY + 1, lineX, barY + barHeight - 1);
         }
         pop();
@@ -2807,32 +2877,78 @@ class Level {
     pop();
   }
 
-  _drawRecipeBookCloseButton(bookLeft, bookTop, bookWidth) {
+  _getRecipeCloseButtonPos(bookLeft, bookTop, bookWidth) {
+    // Reusable helper to compute close button position consistently
+    // in both draw and click handlers.
     const btnSize = 36;
-    const btnX = bookLeft + bookWidth - btnSize / 2 + 32;
-    const btnY = bookTop + btnSize / 2 - 26;
+    let btnX, btnY;
+    if (this.levelNumber === 3 && this.orderStarted) {
+      // Level 3 post-order: place in top-right corner of BASE_WIDTH/HEIGHT
+      // Shift left to avoid overlapping the envelope icon
+      btnX = BASE_WIDTH - 80 - btnSize / 2; // 80px from right edge
+      btnY = btnSize / 2 + 56; // 56px from top edge (moved down)
+    } else {
+      // Pre-order or other levels: attach to book
+      btnX = bookLeft + bookWidth - btnSize / 2 + 32;
+      btnY = bookTop + btnSize / 2 - 26;
+    }
+    return { btnX, btnY, btnSize };
+  }
+
+  _drawRecipeBookCloseButton(bookLeft, bookTop, bookWidth) {
+    const { btnX, btnY, btnSize } = this._getRecipeCloseButtonPos(
+      bookLeft,
+      bookTop,
+      bookWidth,
+    );
 
     const {
       scaleFactor: _sf,
       offsetX: _ox,
       offsetY: _oy,
     } = getScaleAndOffset();
-    const adjustedMX_book = (mouseX - _ox) / _sf;
-    const adjustedMY_book = (mouseY - _oy) / _sf;
+    // Compute adjusted mouse in BASE coords for hover detection
+    const adjustedMX_btn = (mouseX - _ox) / _sf;
+    const adjustedMY_btn = (mouseY - _oy) / _sf;
     const isCloseBtnHovered =
-      adjustedMX_book > btnX - btnSize / 2 &&
-      adjustedMX_book < btnX + btnSize / 2 &&
-      adjustedMY_book > btnY - btnSize / 2 &&
-      adjustedMY_book < btnY + btnSize / 2;
+      adjustedMX_btn > btnX - btnSize / 2 &&
+      adjustedMX_btn < btnX + btnSize / 2 &&
+      adjustedMY_btn > btnY - btnSize / 2 &&
+      adjustedMY_btn < btnY + btnSize / 2;
 
+    // Determine hover color; make it slightly lighter for Level 3 post-order
+    const defaultHoverColor = "#E83030";
+    const level3LighterHover = "#FF4747"; // very slightly lighter hover for Level 3 post-order
+    const baseFillColor = "#D00000";
+    const hoverColor = isCloseBtnHovered
+      ? this.levelNumber === 3 && this.orderStarted
+        ? level3LighterHover
+        : defaultHoverColor
+      : baseFillColor;
+
+    // Debug: Log button position and mouse info (remove later if not needed)
+    if (frameCount % 30 === 0) {
+      console.log(
+        `[Close Btn DRAW] Pos: (${btnX.toFixed(0)}, ${btnY.toFixed(0)}), Size: ${btnSize}, Hovered: ${isCloseBtnHovered}, OrderStarted: ${this.orderStarted}, Color: ${hoverColor}`,
+      );
+    }
+
+    // Draw close button (drawn in BASE coords, will be scaled by drawLevel transform)
+    console.log(
+      `[Close Btn DRAW] Drawing at (${btnX}, ${btnY}), fillColor: ${hoverColor}`,
+    );
     rectMode(CENTER);
-    fill(isCloseBtnHovered ? "#E83030" : "#D00000");
     noStroke();
+    fill(hoverColor);
     rect(btnX, btnY, btnSize, btnSize, 5);
     fill("#FFF4E5");
     textAlign(CENTER, CENTER);
     textSize(26);
     text("×", btnX, btnY + 3);
+
+    // Update cursor
+    if (isCloseBtnHovered) cursor(HAND);
+    else cursor(ARROW);
   }
 
   // -------------------------------------------------------
@@ -2902,8 +3018,10 @@ class Level {
     textAlign(CENTER, TOP);
     fill(55, 30, 10);
     const displayLevelForRecipe = this.levelNumber === 2 ? 3 : this.levelNumber;
-    const potionTitle =
-      displayLevelForRecipe === 1 ? "Beginner's Luck" : "Sparks Fly";
+    let potionTitle;
+    if (displayLevelForRecipe === 1) potionTitle = "Beginner's Luck";
+    else if (displayLevelForRecipe === 2) potionTitle = "Sparks Fly";
+    else potionTitle = "Last Light";
     text(potionTitle, leftPageCX, bookTop + 66);
 
     // — Thin rule below title — (removed)
@@ -2920,9 +3038,10 @@ class Level {
 
     const _desc =
       displayLevelForRecipe === 1
-        ? "Brewed under a waning moon, said to tip f ate's scales in the " +
-          "drinker\u2019s  favour before a wager\u2026or a duel."
-        : "When stars align and ingredients ignite, magic stirs the heart and sets passion alight.";
+        ? "Brewed under a waning moon, said to tip fate's scales in the drinker\u2019s favour before a wager or a duel."
+        : displayLevelForRecipe === 2
+          ? "When stars align and ingredients ignite, magic stirs the heart and sets passion alight."
+          : "When all else fails and hope wears thin, this remedy is said to restore life at death's edge.";
 
     // Manual word-wrap
     const _words = _desc.split(" ");
@@ -2972,8 +3091,13 @@ class Level {
     // Diagram centroid sits at (726, 298) — right half of the open book.
     const SHIFT_X = 12; // nudge entire diagram right by this many pixels
     const DIAGRAM_NUDGE_UP = 28; // move diagram higher on the page
-    const CX = 726 + SHIFT_X,
-      CY = 298 - DIAGRAM_NUDGE_UP; // centroid (nudged up)
+    const CX = 726 + SHIFT_X;
+    // Default centroid Y (nudged up). For Level 1 and 2, nudge down a bit
+    // so the diagram sits lower on the page; keep Level 3 unchanged.
+    let CY = 298 - DIAGRAM_NUDGE_UP; // centroid (nudged up)
+    if (this.levelNumber !== 3) CY += 20; // move Level 1 & 2 diagrams down by 20px
+    // Nudge entire diagram down very slightly for visual alignment
+    CY += 8; // moved down 2px more
     const RING_R = 89; // outer ring radius
     const INNER_R = 36; // inner ring radius
     const SYM = 28; // symbol render size (square)
@@ -3032,18 +3156,39 @@ class Level {
       const STAR_POINTS = 7;
       // make the star 'thinner' by using a larger outer radius
       const starOuterR = RING_R * 1.35;
+      // Map specific symbols to each of the 7 points (Point 1..7 correspond
+      // to indices 0..6). Requested mapping:
+      // Point 1 -> symbol-lightpink
+      // Point 2 -> symbol-lightpink2
+      // Point 3 -> symbol-darkpurple
+      // Point 4 -> symbol-lightblue2
+      // Point 5 -> symbol-orange2
+      // Point 6 -> symbol-yellow2
+      // Point 7 -> symbol-lightpurple2
       const symbolList = [
-        this.assets.symbolBlack,
-        this.assets.symbolDarkgreen || this.assets.symbolDarkgreen,
-        this.assets.symbolMidblue,
-        this.assets.symbolLightpurple,
-        this.assets.symbolLightgreen,
-        this.assets.symbolOrange,
-        this.assets.symbolTeal,
+        this.assets.symbolLightpink,
+        this.assets.symbolLightpink2,
+        // swapped: place Orange2 at point 3 and Darkpurple at point 5
+        this.assets.symbolOrange2,
+        this.assets.symbolLightblue2,
+        this.assets.symbolDarkpurple,
+        this.assets.symbolYellow2,
+        this.assets.symbolLightpurple2,
       ];
       vertices = [];
       // Start at -90deg so one point is at the top
       const startAng = -HALF_PI;
+      // Labels requested by the user for points 1..7
+      const labelsList = [
+        "Midpoint, mix after.",
+        "Where healing starts.",
+        "Penultimate.",
+        "Before the fourth.",
+        "Past the middle.",
+        "Follows the start.",
+        "Final drop.",
+      ];
+
       for (let i = 0; i < STAR_POINTS; i++) {
         const ang = startAng + (TWO_PI * i) / STAR_POINTS;
         const vx = CX + Math.cos(ang) * starOuterR;
@@ -3052,43 +3197,37 @@ class Level {
           x: vx,
           y: vy,
           img: symbolList[i % symbolList.length],
-          label: `Point ${i + 1}.`,
+          label: labelsList[i % labelsList.length],
         });
       }
     } else {
       // Pentagon layout for level 2 and level 4+
-      vertices = [
-        {
-          x: 810 + SHIFT_X,
-          y: 273,
-          img: this.assets.symbolRed,
-          label: "The second.",
-        },
-        {
-          x: 777 + SHIFT_X,
-          y: 368,
-          img: this.assets.symbolLightgreen,
-          label: "Mix, then end.",
-        },
-        {
-          x: 674 + SHIFT_X,
-          y: 368,
-          img: this.assets.symbolMidblue,
-          label: "After the second.",
-        },
-        {
-          x: 644 + SHIFT_X,
-          y: 273,
-          img: this.assets.symbolBlack,
-          label: "The root.",
-        },
-        {
-          x: 726 + SHIFT_X,
-          y: 208,
-          img: this.assets.symbolLightpurple,
-          label: "Nearly there.",
-        },
+      // Compute vertices on a regular pentagon aligned with the outer circle (RING_R)
+      const pentagonRadius = RING_R;
+      const pentagonStartAngle = -HALF_PI; // Start at top (-90°)
+      const pentagonSymbols = [
+        { img: this.assets.symbolRed, label: "The second." },
+        { img: this.assets.symbolLightgreen, label: "Mix, then end." },
+        { img: this.assets.symbolMidblue, label: "After the second." },
+        { img: this.assets.symbolBlack, label: "The root." },
+        { img: this.assets.symbolLightpurple, label: "Nearly there." },
       ];
+      vertices = [];
+      // Generate vertices: start from top and go clockwise (indices 4, 0, 1, 2, 3)
+      // to match label order (Nearly there is at index 4, but displayed last in order)
+      const vertexOrder = [4, 0, 1, 2, 3]; // Reorder to start from "Nearly there" (top)
+      for (let i = 0; i < 5; i++) {
+        const idx = vertexOrder[i];
+        const angle = pentagonStartAngle + (TWO_PI * i) / 5;
+        const vx = CX + Math.cos(angle) * pentagonRadius;
+        const vy = CY + Math.sin(angle) * pentagonRadius;
+        vertices.push({
+          x: vx,
+          y: vy,
+          img: pentagonSymbols[idx].img,
+          label: pentagonSymbols[idx].label,
+        });
+      }
     }
 
     push();
@@ -3137,8 +3276,13 @@ class Level {
     const symbolSize = this.levelNumber === 3 ? SYM * 0.85 : SYM;
     for (const v of vertices) {
       if (v.img) {
-        const h = (v.img.height / v.img.width) * symbolSize;
-        image(v.img, v.x, v.y, symbolSize, h);
+        // Allow a slight size boost for symbol-orange2 on Level 3
+        let drawSize = symbolSize;
+        if (this.levelNumber === 3 && v.img === this.assets.symbolOrange2) {
+          drawSize = symbolSize * 1.25; // increase by ~25% (15% + ~10% more)
+        }
+        const h = (v.img.height / v.img.width) * drawSize;
+        image(v.img, v.x, v.y, drawSize, h);
       }
     }
 
@@ -3177,6 +3321,37 @@ class Level {
           } else {
             g.textAlign(CENTER, TOP);
           }
+        } else if (this.levelNumber === 3) {
+          // Level 3 (star): position the top-most (Midpoint.) label above the symbol, others below
+          // Apply small horizontal nudges per user request to shift some labels
+          // Move selected labels horizontally per user tweaks.
+          if (
+            v.label === "Final drop." ||
+            v.label === "Where healing starts." ||
+            v.label === "Penultimate."
+          ) {
+            lx -= 14; // move left a bit (unchanged)
+          }
+          // Move 'Past the middle.' to the right a bit per request
+          if (v.label === "Past the middle.") {
+            lx -= 18; // move left a bit
+          }
+          // Move these two to the right a bit more
+          if (
+            v.label === "Follows the start." ||
+            v.label === "Before the fourth."
+          ) {
+            lx += 22; // move right a bit
+          }
+
+          if (v.label === "Midpoint, mix after.") {
+            // Nudge the Midpoint label slightly closer to the symbol
+            ly = v.y - offset + 8;
+            g.textAlign(CENTER, BOTTOM);
+          } else {
+            ly = v.y + offset + extraDown;
+            g.textAlign(CENTER, TOP);
+          }
         } else {
           // Pentagon layout: "Nearly there." above, others below
           ly =
@@ -3210,8 +3385,48 @@ class Level {
     image(this._recipeLabelGfx, 0, 0, BASE_WIDTH, BASE_HEIGHT);
     imageMode(CENTER);
 
-    // -- Close button (top-right corner of book) --
-    // Larger close button for recipe screen (keeps same offsets)
+    // If flashlight mode is active, mask the screen so only a circular area
+    // around the cursor is visible (everything else black).
+    if (this.flashlightActive && this.levelNumber === 3) {
+      // Convert mouse to BASE coordinates (drawLevel applies scale/offset)
+      const {
+        scaleFactor: _sf,
+        offsetX: _ox,
+        offsetY: _oy,
+      } = getScaleAndOffset();
+      const mx = (mouseX - _ox) / _sf;
+      const my = (mouseY - _oy) / _sf;
+      const r = this.flashlightRadius;
+
+      // Draw a radial gradient directly onto the main canvas to avoid
+      // offscreen scaling/alignment issues. Gradient goes from transparent
+      // center to opaque black at the edges for soft feathering.
+      const ctx = drawingContext;
+      ctx.save();
+      // Determine overlay rectangle using same insets as the dialog overlay
+      const od = this.overlayDebug || { left: 0, top: 0, right: 0, bottom: 0 };
+      const ox = od.left || 0;
+      const oy = od.top || 0;
+      const ow = BASE_WIDTH - (od.left || 0) - (od.right || 0);
+      const oh = BASE_HEIGHT - (od.top || 0) - (od.bottom || 0);
+
+      // Clip drawing to the overlay rectangle so the gradient only covers that area
+      ctx.beginPath();
+      ctx.rect(ox, oy, ow, oh);
+      ctx.clip();
+
+      const inner = Math.max(2, r * 0.12);
+      const outer = r;
+      const grad = ctx.createRadialGradient(mx, my, inner, mx, my, outer);
+      grad.addColorStop(0, "rgba(0,0,0,0)");
+      grad.addColorStop(0.6, "rgba(0,0,0,0.6)");
+      grad.addColorStop(1, "rgba(0,0,0,1)");
+      ctx.fillStyle = grad;
+      ctx.fillRect(ox, oy, ow, oh);
+      ctx.restore();
+    }
+
+    // Draw close button on top so it remains visible above flashlight overlay
     this._drawRecipeBookCloseButton(bookLeft, bookTop, bookWidth);
 
     pop();
@@ -3241,6 +3456,10 @@ function drawLevel() {
 }
 
 function levelMousePressed() {
+  console.log(
+    "[levelMousePressed] Called - isRecipeOpen:",
+    levelInstance?.isRecipeOpen,
+  );
   if (!levelInstance) return;
 
   const { scaleFactor, offsetX, offsetY } = getScaleAndOffset();
@@ -3568,57 +3787,90 @@ function levelMousePressed() {
   });
 
   // ---- Envelope Icon Click ----
-  const env = layout.envelope;
-  const envHeight =
-    (levelInstance.assets.envelopeImg.height /
-      levelInstance.assets.envelopeImg.width) *
-    env.w;
-  if (
-    !spoonActive &&
-    adjustedX > env.x - env.w / 2 &&
-    adjustedX < env.x + env.w / 2 &&
-    adjustedY > env.y - envHeight / 2 &&
-    adjustedY < env.y + envHeight / 2
-  ) {
-    levelInstance.isOrderOpen = true;
-    return;
+  // Skip envelope clicking if recipe is open (close button takes priority)
+  // or if intro modal is showing ("Very Well" button takes priority)
+  if (!levelInstance.isRecipeOpen && !levelInstance.showRecipeIntro) {
+    const env = layout.envelope;
+    const envHeight =
+      (levelInstance.assets.envelopeImg.height /
+        levelInstance.assets.envelopeImg.width) *
+      env.w;
+    if (
+      !spoonActive &&
+      adjustedX > env.x - env.w / 2 &&
+      adjustedX < env.x + env.w / 2 &&
+      adjustedY > env.y - envHeight / 2 &&
+      adjustedY < env.y + envHeight / 2
+    ) {
+      levelInstance.isOrderOpen = true;
+      return;
+    }
   }
 
   // If intro modal is visible, handle its button click (block all other clicks)
   if (levelInstance.showRecipeIntro) {
+    console.log("[Intro Modal] showRecipeIntro is true - blocking all clicks");
     const b = levelInstance._recipeIntroBtn;
     if (b) {
-      if (adjustedX > b.x && adjustedX < b.x + b.w && adjustedY > b.y && adjustedY < b.y + b.h) {
+      if (
+        adjustedX > b.x &&
+        adjustedX < b.x + b.w &&
+        adjustedY > b.y &&
+        adjustedY < b.y + b.h
+      ) {
         levelInstance.showRecipeIntro = false;
         levelInstance.isRecipeOpen = true; // now show the actual recipe
+        // Unlock and enable flashlight only for Level 3 (persist across opens)
+        if (levelInstance.levelNumber === 3) {
+          levelInstance.flashlightUnlocked = true;
+          levelInstance.flashlightActive = true;
+          // Use a slightly smaller flashlight radius for post-unlock experience
+          levelInstance.flashlightRadius = 60;
+        }
         return;
       }
     }
     return;
   }
 
+  console.log(
+    "[levelMousePressed] After intro modal check - about to check close button",
+  );
+
   // ---- Recipe Book Close Button ----
   if (levelInstance.isRecipeOpen) {
+    console.log("[Close Btn Handler] Entered - isRecipeOpen is true");
     const openBook = levelInstance.assets.recipeBookOpen;
     const bookWidth = 600;
     const bookHeight = (openBook.height / openBook.width) * bookWidth;
     const bookLeft = BASE_WIDTH / 2 - bookWidth / 2;
     const bookTop = BASE_HEIGHT / 2 - bookHeight / 2;
 
-    const btnSize = 36;
-    const btnX = bookLeft + bookWidth - btnSize / 2 + 32;
-    const btnY = bookTop + btnSize / 2 - 26;
+    // Use the same position calculation as the draw function
+    const { btnX, btnY, btnSize } = levelInstance._getRecipeCloseButtonPos(
+      bookLeft,
+      bookTop,
+      bookWidth,
+    );
 
+    // Convert mouse to BASE coordinates
+    const adjustedBtnX = (mouseX - offsetX) / scaleFactor;
+    const adjustedBtnY = (mouseY - offsetY) / scaleFactor;
+
+    // Debug: Log every click to see if we're in this handler
+    console.log(
+      `[Close Btn Click] Pos: (${btnX.toFixed(0)}, ${btnY.toFixed(0)}), Mouse(BASE): (${adjustedBtnX.toFixed(0)}, ${adjustedBtnY.toFixed(0)}), HitX: ${adjustedBtnX > btnX - btnSize / 2 && adjustedBtnX < btnX + btnSize / 2}, HitY: ${adjustedBtnY > btnY - btnSize / 2 && adjustedBtnY < btnY + btnSize / 2}`,
+    );
+
+    // Check if click is within button bounds (in BASE coords)
     if (
-      adjustedX > btnX - btnSize / 2 &&
-      adjustedX < btnX + btnSize / 2 &&
-      adjustedY > btnY - btnSize / 2 &&
-      adjustedY < btnY + btnSize / 2
+      adjustedBtnX > btnX - btnSize / 2 &&
+      adjustedBtnX < btnX + btnSize / 2 &&
+      adjustedBtnY > btnY - btnSize / 2 &&
+      adjustedBtnY < btnY + btnSize / 2
     ) {
+      console.log("[Close Btn Click] HIT - Closing recipe!");
       levelInstance.isRecipeOpen = false;
-      if (levelInstance.levelNumber >= 2) {
-        levelInstance._reshuffleShelfVials();
-      }
       return;
     }
     return; // block clicks behind overlay
@@ -3650,6 +3902,13 @@ function levelMousePressed() {
     }
 
     levelInstance.isRecipeOpen = true;
+    // If the player previously unlocked the flashlight (pressed "Very well."),
+    // enable it automatically when opening the recipe on Level 3.
+    if (levelInstance.levelNumber === 3 && levelInstance.flashlightUnlocked) {
+      levelInstance.flashlightActive = true;
+      // Ensure the unlocked flashlight uses the smaller radius
+      levelInstance.flashlightRadius = 60;
+    }
     return;
   }
 }
@@ -3678,83 +3937,32 @@ function levelKeyPressed() {
     return;
   }
 
-  // Intro modal debug controls
-  if (levelInstance.showRecipeIntro && levelInstance._introDebug) {
-    // Toggle debug HUD
-    if (typeof key !== "undefined" && (key === "T" || key === "t")) {
-      levelInstance._introDebug.enabled = !levelInstance._introDebug.enabled;
-      console.log("Intro debug:", levelInstance._introDebug.enabled);
+  // Debug: press 'T' to toggle flashlight overlay on Level 3 recipe
+  if (key === "t" || key === "T") {
+    console.log(
+      "[Debug Key 'T'] Pressed - Level:",
+      levelInstance.levelNumber,
+      "RecipeOpen:",
+      levelInstance.isRecipeOpen,
+      "Current flashlight state:",
+      levelInstance.flashlightActive,
+    );
+    if (levelInstance.levelNumber === 3 && levelInstance.isRecipeOpen) {
+      levelInstance.flashlightActive = !levelInstance.flashlightActive;
+      console.log(
+        "[Debug] Flashlight toggled. Now:",
+        levelInstance.flashlightActive,
+      );
       return;
-    }
-
-    if (levelInstance._introDebug.enabled) {
-      // Determine step size (shift = larger step)
-      const step = keyIsDown(SHIFT) ? 40 : 8;
-      if (keyCode === LEFT_ARROW) {
-        levelInstance._introDebug.dialogW = Math.max(160, levelInstance._introDebug.dialogW - step);
-        return;
-      }
-      if (keyCode === RIGHT_ARROW) {
-        levelInstance._introDebug.dialogW = Math.min(BASE_WIDTH - 40, levelInstance._introDebug.dialogW + step);
-        return;
-      }
-      if (keyCode === UP_ARROW) {
-        levelInstance._introDebug.dialogH = Math.max(120, levelInstance._introDebug.dialogH - step);
-        return;
-      }
-      if (keyCode === DOWN_ARROW) {
-        levelInstance._introDebug.dialogH = Math.min(BASE_HEIGHT - 40, levelInstance._introDebug.dialogH + step);
-        return;
-      }
-      // Alpha adjustments: '[' / ']'
-      if (typeof key === "string" && key === "[") {
-        levelInstance._introDebug.alpha = Math.max(0, (levelInstance._introDebug.alpha || 255) - 10);
-        return;
-      }
-      if (typeof key === "string" && key === "]") {
-        levelInstance._introDebug.alpha = Math.min(255, (levelInstance._introDebug.alpha || 255) + 10);
-        return;
-      }
-      // Reset
-      if (typeof key === "string" && (key === "R" || key === "r")) {
-        levelInstance._introDebug.dialogW = 520;
-        levelInstance._introDebug.dialogH = 260;
-        levelInstance._introDebug.alpha = 255;
-        levelInstance._introDebug.xOffset = 0;
-        levelInstance._introDebug.yOffset = 0;
-        return;
-      }
-      // Save debug config to localStorage (P)
-      if (typeof key === "string" && (key === "P" || key === "p")) {
-        if (typeof localStorage !== "undefined") {
-          try {
-            localStorage.setItem(
-              "introDebug",
-              JSON.stringify(levelInstance._introDebug),
-            );
-            console.log("Saved introDebug to localStorage:", levelInstance._introDebug);
-          } catch (e) {
-            console.warn("Failed to save introDebug", e);
-          }
-        }
-        return;
-      }
-      // Load debug config from localStorage (0)
-      if (typeof key === "string" && key === "0") {
-        if (typeof localStorage !== "undefined") {
-          const raw = localStorage.getItem("introDebug");
-          if (raw) {
-            try {
-              const obj = JSON.parse(raw);
-              levelInstance._introDebug = Object.assign(levelInstance._introDebug || {}, obj);
-              console.log("Loaded introDebug:", levelInstance._introDebug);
-            } catch (e) {
-              console.warn("Failed to parse saved introDebug", e);
-            }
-          }
-        }
-        return;
-      }
+    } else {
+      console.log(
+        "[Debug] Conditions not met for toggle - Level:",
+        levelInstance.levelNumber,
+        "RecipeOpen:",
+        levelInstance.isRecipeOpen,
+      );
     }
   }
+
+  // No other interactive overlay debug controls
 }

@@ -82,6 +82,7 @@ function preload() {
   bottleLightgreen = loadImage("assets/vials/closed-lightgreen.svg");
   bottleLightpink = loadImage("assets/vials/closed-lightpink.svg");
   bottleLightpurple = loadImage("assets/vials/closed-lightpurple.svg");
+  bottleLightpurple2 = loadImage("assets/vials/closed-lightpurple2.svg");
   bottleLightred = loadImage("assets/vials/closed-lightred.svg");
   bottleMidblue = loadImage("assets/vials/closed-midblue.svg");
   bottleClosedOrange = loadImage("assets/vials/closed-orange.svg");
@@ -102,11 +103,14 @@ function preload() {
   bottleOpenLightgreen = loadImage("assets/vials/open-lightgreen.svg");
   bottleOpenLightpink = loadImage("assets/vials/open-lightpink.svg");
   bottleOpenLightpurple = loadImage("assets/vials/open-lightpurple.svg");
+  bottleOpenLightpurple2 = loadImage("assets/vials/open-lightpurple2.svg");
   bottleOpenLightred = loadImage("assets/vials/open-lightred.svg");
   bottleOpenMidblue = loadImage("assets/vials/open-midblue.svg");
   bottleOpenOrange = loadImage("assets/vials/open-orange.svg");
   bottleOpenOrange2 = loadImage("assets/vials/open-orange2.svg");
   bottleOpenTeal = loadImage("assets/vials/open-teal.svg");
+  bottleTeal2 = loadImage("assets/vials/closed-teal2.svg");
+  bottleOpenTeal2 = loadImage("assets/vials/open-teal2.svg");
   bottleOpenYellow = loadImage("assets/vials/open-yellow.svg");
   bottleOpenYellow2 = loadImage("assets/vials/open-yellow2.svg");
   bottleOpenLightblue2 = loadImage("assets/vials/open-lightblue2.svg");
@@ -128,6 +132,12 @@ function preload() {
   symbolLightpink2 = loadImage("assets/symbols/symbol-lightpink2.svg");
   symbolOrange2 = loadImage("assets/symbols/symbol-orange2.svg");
   symbolYellow2 = loadImage("assets/symbols/symbol-yellow2.svg");
+
+  // Additional symbol variants used by Level 3
+  symbolLightpink = loadImage("assets/symbols/symbol-lightpink.svg");
+  symbolLightblue2 = loadImage("assets/symbols/symbol-lightblue2.svg");
+  symbolDarkpurple = loadImage("assets/symbols/symbol-darkpurple.svg");
+  symbolLightpurple2 = loadImage("assets/symbols/symbol-lightpurple2.svg");
 
   // Additional symbol variants (used by recipes)
   symbolDarkgreen = loadImage("assets/symbols/symbol-darkgreen.svg");
@@ -182,11 +192,13 @@ function createLevelInstance() {
     bottleLightgreen,
     bottleLightpink,
     bottleLightpurple,
+    bottleLightpurple2,
     bottleLightred,
     bottleMidblue,
     bottleClosedOrange,
     bottleOrange2,
     bottleTeal,
+    bottleTeal2,
     bottleYellow,
     bottleYellow2,
     bottleLightblue2,
@@ -201,11 +213,13 @@ function createLevelInstance() {
     bottleOpenLightgreen,
     bottleOpenLightpink,
     bottleOpenLightpurple,
+    bottleOpenLightpurple2,
     bottleOpenLightred,
     bottleOpenMidblue,
     bottleOpenOrange,
     bottleOpenOrange2,
     bottleOpenTeal,
+    bottleOpenTeal2,
     bottleOpenYellow,
     bottleOpenYellow2,
     bottleOpenLightblue2,
@@ -232,6 +246,11 @@ function createLevelInstance() {
   levelInstance.assets.symbolLightpink2 = symbolLightpink2;
   levelInstance.assets.symbolOrange2 = symbolOrange2;
   levelInstance.assets.symbolYellow2 = symbolYellow2;
+  // Attach additional Level 3 symbol variants
+  levelInstance.assets.symbolLightpink = symbolLightpink;
+  levelInstance.assets.symbolLightblue2 = symbolLightblue2;
+  levelInstance.assets.symbolDarkpurple = symbolDarkpurple;
+  levelInstance.assets.symbolLightpurple2 = symbolLightpurple2;
   // Attach new symbol assets
   levelInstance.assets.symbolDarkgreen = symbolDarkgreen;
   levelInstance.assets.symbolOrange = symbolOrange;
@@ -309,10 +328,15 @@ function mousePressed() {
   // start.js         → startMousePressed()
   // instructions.js  → instrMousePressed()
 
+  console.log("[main.js mousePressed] Called - currentScreen:", currentScreen);
   if (currentScreen === "start") startMousePressed();
   else if (currentScreen === "instr") instrMousePressed();
   else if (currentScreen === "map") mapMousePressed();
-  else if (currentScreen === "level") levelMousePressed();
+  else if (currentScreen === "level") {
+    console.log("[main.js] Routing to levelMousePressed");
+    levelMousePressed();
+  }
+  return false; // Prevent default browser behavior
 }
 
 // ------------------------------
@@ -349,6 +373,10 @@ function keyPressed() {
     jumpToLevel(2);
     return;
   }
+  if (key === "3") {
+    jumpToLevel(3);
+    return;
+  }
 
   // Result jumps: A-F -> show result banners for quick testing
   if (typeof key === "string") {
@@ -375,6 +403,20 @@ function keyPressed() {
     }
     if (k === "F") {
       jumpToLevelResult(2, "TIMEOUT");
+      return;
+    }
+
+    // Debug shortcuts for Level 3 results
+    if (k === "X") {
+      jumpToLevelResult(3, "CORRECT");
+      return;
+    }
+    if (k === "Y") {
+      jumpToLevelResult(3, "WRONG");
+      return;
+    }
+    if (k === "Z") {
+      jumpToLevelResult(3, "TIMEOUT");
       return;
     }
 

@@ -509,96 +509,35 @@ const Results = {
     const ba = Results._backToMapBtn;
 
     // Play Again / Try Again
-    if (
+    // Primary hit-test uses the provided mx/my (BASE coords). As a fallback,
+    // also test the actual global mouse position converted to BASE coords
+    // in case callers passed inconsistent coordinates (protects Level 3).
+    const {
+      scaleFactor: _sf,
+      offsetX: _ox,
+      offsetY: _oy,
+    } = typeof getScaleAndOffset === "function"
+      ? getScaleAndOffset()
+      : { scaleFactor: 1, offsetX: 0, offsetY: 0 };
+    const rawMX = typeof mouseX !== "undefined" ? (mouseX - _ox) / _sf : mx;
+    const rawMY = typeof mouseY !== "undefined" ? (mouseY - _oy) / _sf : my;
+
+    const playedClicked =
       pa.w > 0 &&
-      mx >= pa.x &&
-      mx <= pa.x + pa.w &&
-      my >= pa.y &&
-      my <= pa.y + pa.h
-    ) {
+      ((mx >= pa.x && mx <= pa.x + pa.w && my >= pa.y && my <= pa.y + pa.h) ||
+        (rawMX >= pa.x &&
+          rawMX <= pa.x + pa.w &&
+          rawMY >= pa.y &&
+          rawMY <= pa.y + pa.h));
+
+    if (playedClicked) {
       // Reset the results animation state
       Results._unfurlStart = null;
       Results._lastResult = null;
 
-      // Recreate a fresh level instance on the current level and switch to the level screen
-      // This ensures the game truly restarts from the level screen.
-      currentScreen = "level";
-      levelInstance = new Level({
-        levelNumber: currentLevelNumber,
-        cauldronImg,
-        cauldronImgGlow,
-        recipeBookClosed,
-        recipeBookOpen,
-        levelBg,
-        orderSheet,
-        blankOrderSheet2,
-        bottleBlack,
-        bottleBlack2,
-        bottleDarkgreen,
-        bottleDarkgreen2,
-        bottleDarkpurple,
-        bottleLightblue,
-        bottleLightgreen,
-        bottleLightpink,
-        bottleLightpurple,
-        bottleLightred,
-        bottleMidblue,
-        bottleClosedOrange,
-        bottleOrange2,
-        bottleTeal,
-        bottleYellow,
-        bottleYellow2,
-        bottleLightblue2,
-        bottleLightpink2,
-        // Open variants
-        bottleOpenBlack,
-        bottleOpenBlack2,
-        bottleOpenDarkgreen,
-        bottleOpenDarkgreen2,
-        bottleOpenDarkpurple,
-        bottleOpenLightblue,
-        bottleOpenLightgreen,
-        bottleOpenLightpink,
-        bottleOpenLightpurple,
-        bottleOpenLightred,
-        bottleOpenMidblue,
-        bottleOpenOrange,
-        bottleOpenOrange2,
-        bottleOpenTeal,
-        bottleOpenYellow,
-        bottleOpenYellow2,
-        bottleOpenLightblue2,
-        bottleOpenLightpink2,
-        crystalImg,
-        bowlImg,
-        envelopeImg,
-        spoonImg,
-        greenSymbol,
-        blueSymbol,
-        orangeSymbol,
-      });
-      // Ensure the recipe-book background asset is attached (matches setup())
-      if (typeof recipeBookBg !== "undefined") {
-        levelInstance.assets.recipeBookBg = recipeBookBg;
-      }
-      // Reattach symbol assets used by the recipe diagram (matches setup())
-      if (typeof symbolBlack !== "undefined") {
-        levelInstance.assets.symbolBlack = symbolBlack;
-        levelInstance.assets.symbolLightgreen = symbolLightgreen;
-        levelInstance.assets.symbolLightpurple = symbolLightpurple;
-        levelInstance.assets.symbolMidblue = symbolMidblue;
-        levelInstance.assets.symbolRed = symbolRed;
-        levelInstance.assets.symbolLightpink2 = symbolLightpink2;
-        levelInstance.assets.symbolOrange2 = symbolOrange2;
-        levelInstance.assets.symbolYellow2 = symbolYellow2;
-        // Attach newer symbol variants added in main.js
-        if (typeof symbolDarkgreen !== "undefined")
-          levelInstance.assets.symbolDarkgreen = symbolDarkgreen;
-        if (typeof symbolOrange !== "undefined")
-          levelInstance.assets.symbolOrange = symbolOrange;
-        if (typeof symbolTeal !== "undefined")
-          levelInstance.assets.symbolTeal = symbolTeal;
-      }
+      // Use the central helper to recreate the level instance and switch
+      // screens to ensure assets are attached consistently.
+      jumpToLevel(currentLevelNumber);
       return;
     }
 
