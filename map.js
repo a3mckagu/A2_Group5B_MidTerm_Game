@@ -8,30 +8,86 @@
 const BASE_W = 1152;
 const BASE_H = 648;
 
-// Toggle to show hitbox debug overlay on the map screen.
-// Toggled by the global debug key `H` (see main.js)
-let MAP_DEBUG_HITBOX = false;
-
 // Hover animation state for map icons fade
 let mapIconHoverFade = 0;
 const MAP_ICON_FADE_SPEED = 0.08; // fade speed per frame
 
-// Level hit-area parameters (relative to map image center)
-// Final defaults (aligned to Level 1 artwork). Use debug keys if needed.
-// Values chosen from interactive tuning overlay.
-let level1RelX = -0.4; // negative = left
-let level1RelY = 0.295; // positive = down
-let level1RelDiameter = 0.18;
+// ========== HITBOX CONFIGURATION ==========
+// All hitboxes are centered on the map screen (BASE_W/2, BASE_H/2)
+// Modify these variables to adjust hitbox positions and sizes
 
-// Level 2 hitbox is 30px to the right of Level 1
-let level2RelX = -0.4 + 0.0386; // ~30px shift (30/778 ≈ 0.0386)
-let level2RelY = 0.295;
-let level2RelDiameter = 0.18;
+// LEVEL 1: Circle at center
+const LEVEL1_HITBOX = {
+  centerX: BASE_W / 2 - 288,
+  centerY: BASE_H / 2 + 122,
+  radius: 87, // diameter will be radius * 2
+};
 
-// Level 3 hitbox is 60px to the right of Level 1 (30px right from Level 2)
-let level3RelX = -0.4 + 0.0772; // ~60px shift (60/778 ≈ 0.0772)
-let level3RelY = 0.295;
-let level3RelDiameter = 0.18;
+// LEVEL 2: Norman window shape (rectangle with semicircle on top)
+// Norman window = rectangle body + semicircle top
+const LEVEL2_HITBOX = {
+  centerX: BASE_W / 2 - 85,
+  centerY: BASE_H / 2 + 50, // positioned slightly lower
+  rectWidth: 153, // width of rectangular body
+  rectHeight: 170, // height of rectangular body (doesn't include semicircle)
+  // semicircle sits on top with same width as rect
+};
+
+// LEVEL 3: Norman window shape (same as Level 2, positioned higher with red fill)
+const LEVEL3_HITBOX = {
+  centerX: BASE_W / 2 + 242,
+  centerY: BASE_H / 2 + 210, // positioned slightly higher
+  rectWidth: 265,
+  rectHeight: 221,
+};
+
+// Next Level button in bottom left corner
+const NEXT_LEVEL_BUTTON = {
+  x: 80,
+  y: BASE_H - 40,
+  w: 140,
+  h: 50,
+  label: "Next Level",
+};
+
+// ========== HITBOX DETECTION HELPERS ==========
+
+// Check if a point is inside Level 1 circle hitbox
+function isPointInLevel1Circle(px, py) {
+  const dx = px - LEVEL1_HITBOX.centerX;
+  const dy = py - LEVEL1_HITBOX.centerY;
+  const distSq = dx * dx + dy * dy;
+  const radiusSq = LEVEL1_HITBOX.radius * LEVEL1_HITBOX.radius;
+  return distSq <= radiusSq;
+}
+
+// Check if a point is inside a Norman window shape (rectangle + semicircle on top)
+function isPointInNormanWindow(px, py, config) {
+  const rectLeft = config.centerX - config.rectWidth / 2;
+  const rectRight = config.centerX + config.rectWidth / 2;
+  const rectTop = config.centerY - config.rectHeight;
+  const rectBottom = config.centerY;
+
+  // Check if inside rectangular body
+  if (px >= rectLeft && px <= rectRight && py >= rectTop && py <= rectBottom) {
+    return true;
+  }
+
+  // Check if inside semicircle on top
+  // Semicircle center is at the top of the rectangle
+  const semicircleTop = rectTop;
+  const semicircleRadius = config.rectWidth / 2;
+  const dx = px - config.centerX;
+  const dy = py - semicircleTop;
+
+  if (dy <= 0 && dy >= -semicircleRadius) {
+    // Point is above the rectangle line
+    const distSq = dx * dx + dy * dy;
+    return distSq <= semicircleRadius * semicircleRadius;
+  }
+
+  return false;
+}
 
 function drawMap() {
   background(0);
@@ -47,97 +103,40 @@ function drawMap() {
   // Draw background (in base coordinates)
   image(levelMenu, 0, 0, BASE_W, BASE_H);
 
-  // Draw map icons image centered in the middle of the screen
-  const mapIconWidth = 778;
-
   // Select the correct map icons based on current level
-  let currentDefaultIcons,
-    currentHoverIcons,
-    currentRelX,
-    currentRelY,
-    currentRelDiameter,
-    hitboxType = "circle",
-    hitboxOffsetX = 0,
-    hitboxOffsetY = 0,
-    hitboxW = 0,
-    hitboxH = 0;
+  let currentDefaultIcons, currentHoverIcons;
 
   if (currentLevelNumber === 1) {
     currentDefaultIcons = mapIconsDefault;
     currentHoverIcons = mapIconsHover;
-    currentRelX = level1RelX;
-    currentRelY = level1RelY;
-    currentRelDiameter = level1RelDiameter;
-    hitboxType = "circle";
   } else if (currentLevelNumber === 2) {
     currentDefaultIcons = mapIconsLevel2Default;
     currentHoverIcons = mapIconsLevel2Hover;
-    hitboxType = "rect";
-    hitboxOffsetX = -155;
-    hitboxOffsetY = -34;
-    hitboxW = 118;
-    hitboxH = 175;
   } else {
     // Level 3+
     currentDefaultIcons = mapIconsLevel3Default;
     currentHoverIcons = mapIconsLevel3Hover;
-    hitboxType = "square";
-    hitboxOffsetX = 48;
-    hitboxOffsetY = 80;
-    hitboxW = 138;
-    hitboxH = 138;
   }
 
   const mapIconAspectRatio =
     currentDefaultIcons.height / currentDefaultIcons.width;
+  const mapIconWidth = 778;
   const mapIconHeight = mapIconWidth * mapIconAspectRatio;
   const mapIconX = BASE_W / 2;
   const mapIconY = BASE_H / 2;
+
   // Check if mouse is hovering over the level hitbox (in base coordinates)
   const adjustedMX = (mouseX - offsetX) / scaleFactor;
   const adjustedMY = (mouseY - offsetY) / scaleFactor;
 
-  // Calculate hitbox position based on level type
-  let levelX, levelY, isHovering;
-
+  // Determine if hovering based on current level's hitbox
+  let isHovering = false;
   if (currentLevelNumber === 1) {
-    // Level 1: Circle hitbox at center position
-    levelX = mapIconX + mapIconWidth * currentRelX;
-    levelY = mapIconY + mapIconHeight * currentRelY;
-    const levelDiameter = mapIconWidth * currentRelDiameter;
-
-    const dx = adjustedMX - levelX;
-    const dy = adjustedMY - levelY;
-    const distToLevel = Math.sqrt(dx * dx + dy * dy);
-    isHovering = distToLevel <= levelDiameter / 2;
+    isHovering = isPointInLevel1Circle(adjustedMX, adjustedMY);
   } else if (currentLevelNumber === 2) {
-    // Level 2: Rectangle hitbox with pixel offsets
-    levelX = mapIconX + hitboxOffsetX;
-    levelY = mapIconY + hitboxOffsetY;
-    const rectLeft = levelX - hitboxW / 2;
-    const rectTop = levelY - hitboxH / 2;
-    const rectRight = levelX + hitboxW / 2;
-    const rectBottom = levelY + hitboxH / 2;
-
-    isHovering =
-      adjustedMX >= rectLeft &&
-      adjustedMX <= rectRight &&
-      adjustedMY >= rectTop &&
-      adjustedMY <= rectBottom;
+    isHovering = isPointInNormanWindow(adjustedMX, adjustedMY, LEVEL2_HITBOX);
   } else {
-    // Level 3+: Square hitbox with pixel offsets
-    levelX = mapIconX + hitboxOffsetX;
-    levelY = mapIconY + hitboxOffsetY;
-    const squareLeft = levelX - hitboxW / 2;
-    const squareTop = levelY - hitboxH / 2;
-    const squareRight = levelX + hitboxW / 2;
-    const squareBottom = levelY + hitboxH / 2;
-
-    isHovering =
-      adjustedMX >= squareLeft &&
-      adjustedMX <= squareRight &&
-      adjustedMY >= squareTop &&
-      adjustedMY <= squareBottom;
+    isHovering = isPointInNormanWindow(adjustedMX, adjustedMY, LEVEL3_HITBOX);
   }
 
   // Update fade animation based on hover state
@@ -169,45 +168,14 @@ function drawMap() {
   textAlign(CENTER, CENTER);
   text("Alchemy Map", BASE_W / 2, BASE_H * 0.14);
 
-  // Debug: draw hitbox overlay when enabled
-  if (MAP_DEBUG_HITBOX) {
-    // Level 1 (circle)
-    const l1x = mapIconX + mapIconWidth * level1RelX;
-    const l1y = mapIconY + mapIconHeight * level1RelY;
-    const l1diam = mapIconWidth * level1RelDiameter;
-
-    noFill();
-    stroke(0, 255, 100);
-    strokeWeight(2);
-    ellipse(l1x, l1y, l1diam, l1diam);
-
-    // Level 2 (circle-like representation using relative coords)
-    const l2x = mapIconX + mapIconWidth * level2RelX;
-    const l2y = mapIconY + mapIconHeight * level2RelY;
-    const l2diam = mapIconWidth * level2RelDiameter;
-    stroke(255, 180, 0);
-    ellipse(l2x, l2y, l2diam, l2diam);
-
-    // Level 3 (circle-like representation using relative coords)
-    const l3x = mapIconX + mapIconWidth * level3RelX;
-    const l3y = mapIconY + mapIconHeight * level3RelY;
-    const l3diam = mapIconWidth * level3RelDiameter;
-    stroke(200, 80, 255);
-    ellipse(l3x, l3y, l3diam, l3diam);
-
-    // Draw readout for level1 values
-    noStroke();
-    fill(255);
-    textAlign(LEFT, TOP);
-    textSize(13);
-    const infoX = 16;
-    const infoY = BASE_H - 110;
-    text(
-      `Hitbox debug (H toggle)\nJ / L: left / right\nI / K: up / down\nN / M: smaller / larger\nP: save   0: load\n\nLevel1 x=${level1RelX.toFixed(4)} y=${level1RelY.toFixed(4)} d=${level1RelDiameter.toFixed(4)}`,
-      infoX,
-      infoY,
-    );
-  }
+  // Draw the "Next Level" button in bottom left corner
+  drawButton({
+    x: NEXT_LEVEL_BUTTON.x,
+    y: NEXT_LEVEL_BUTTON.y,
+    w: NEXT_LEVEL_BUTTON.w,
+    h: NEXT_LEVEL_BUTTON.h,
+    label: NEXT_LEVEL_BUTTON.label,
+  });
 
   pop();
 
@@ -220,9 +188,56 @@ function drawMap() {
 // ------------------------------------------------------------
 // Called from main.js only when currentScreen === "map"
 function mapMousePressed() {
-  // Create a fresh level instance and transition to gameplay
-  createLevelInstance();
-  currentScreen = "level";
+  // Calculate scale and offset to convert mouse coordinates
+  const scaleFactor = min(width / BASE_W, height / BASE_H);
+  const offsetX = (width - BASE_W * scaleFactor) / 2;
+  const offsetY = (height - BASE_H * scaleFactor) / 2;
+
+  // Convert mouse coordinates to base coordinates (accounting for scale and offset)
+  const adjustedMX = (mouseX - offsetX) / scaleFactor;
+  const adjustedMY = (mouseY - offsetY) / scaleFactor;
+
+  // Check if the "Next Level" button was clicked
+  const buttonLeft = NEXT_LEVEL_BUTTON.x - NEXT_LEVEL_BUTTON.w / 2;
+  const buttonRight = NEXT_LEVEL_BUTTON.x + NEXT_LEVEL_BUTTON.w / 2;
+  const buttonTop = NEXT_LEVEL_BUTTON.y - NEXT_LEVEL_BUTTON.h / 2;
+  const buttonBottom = NEXT_LEVEL_BUTTON.y + NEXT_LEVEL_BUTTON.h / 2;
+
+  if (
+    adjustedMX >= buttonLeft &&
+    adjustedMX <= buttonRight &&
+    adjustedMY >= buttonTop &&
+    adjustedMY <= buttonBottom
+  ) {
+    // Next Level button was clicked - increment level
+    currentLevelNumber++;
+    // Stay on the map screen to show the updated level
+    return;
+  }
+
+  // Check if click is on the current level's hitbox
+  let clickedOnLevel = false;
+  if (currentLevelNumber === 1) {
+    clickedOnLevel = isPointInLevel1Circle(adjustedMX, adjustedMY);
+  } else if (currentLevelNumber === 2) {
+    clickedOnLevel = isPointInNormanWindow(
+      adjustedMX,
+      adjustedMY,
+      LEVEL2_HITBOX,
+    );
+  } else {
+    clickedOnLevel = isPointInNormanWindow(
+      adjustedMX,
+      adjustedMY,
+      LEVEL3_HITBOX,
+    );
+  }
+
+  // Only start the game if clicking on the hitbox
+  if (clickedOnLevel) {
+    createLevelInstance();
+    currentScreen = "level";
+  }
 }
 
 // ------------------------------------------------------------

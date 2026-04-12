@@ -420,18 +420,6 @@ function keyPressed() {
       return;
     }
 
-    // H: open map and toggle hitbox overlay (works from anywhere)
-    if (k === "H") {
-      // Ensure we are on the map so the overlay is visible
-      if (currentScreen !== "map") currentScreen = "map";
-      // Toggle overlay flag (declared in map.js)
-      if (typeof MAP_DEBUG_HITBOX === "undefined") {
-        window.MAP_DEBUG_HITBOX = true;
-      } else {
-        MAP_DEBUG_HITBOX = !MAP_DEBUG_HITBOX;
-      }
-      return;
-    }
     // G: toggle spoon hitbox debug overlay
     if (k === "G") {
       if (typeof SPOON_DEBUG_HITBOX === "undefined") {
@@ -442,7 +430,15 @@ function keyPressed() {
       return;
     }
 
-    // Tuning keys that currently affect Level 1 hitbox values only
+    // H: toggle all level hitboxes (vials, cauldron, crystal, spoon)
+    if (k === "H") {
+      if (typeof LEVEL_DEBUG_HITBOX === "undefined") {
+        window.LEVEL_DEBUG_HITBOX = true;
+      } else {
+        LEVEL_DEBUG_HITBOX = !LEVEL_DEBUG_HITBOX;
+      }
+      return;
+    }
     // Left / Right: J / L
     if (k === "J") {
       level1RelX -= 0.005;

@@ -14,6 +14,8 @@ function getScaleAndOffset() {
 }
 // Toggle to show spoon hitbox debug overlay.
 let SPOON_DEBUG_HITBOX = false;
+// Toggle to show all level hitboxes (vials, cauldron, crystal, spoon)
+let LEVEL_DEBUG_HITBOX = false;
 // Vertical offset (pixels) applied to the spoon hitbox. Negative moves the
 // hit area up, positive moves it down. Adjust while debugging.
 let SPOON_HITBOX_Y_OFFSET = -10;
@@ -372,6 +374,21 @@ class Level {
     this.showRecipeIntro = false; // runtime flag to display the intro modal
     this._recipeIntroBtn = null;
 
+    // Envelope guide text for Level 1 (shows at start, fades out when envelope clicked)
+    this.envelopeGuideShown = false; // becomes true when level starts to trigger fade-in
+    this.envelopeClicked = false; // becomes true when player clicks envelope for first time
+    this.envelopeGuideAlpha = 0; // alpha for fade animation (0-255)
+    this.envelopeGuideFadeInProgress = false; // true while fading in
+    this.envelopeGuideFadeOutProgress = false; // true while fading out
+
+    // First vial guide text for Level 1 (only shows after envelope clicked)
+    this.firstVialPickedUp = false; // becomes true when player picks up first vial
+    this.firstVialPoured = false; // becomes true when player pours first vial
+    this.firstVialGuideAlpha = 0; // alpha for fade animation (0-255)
+    this.firstVialGuideFadeInProgress = false; // true while fading in
+    this.firstVialGuideFadeOutProgress = false; // true while fading out
+    this.FIRST_VIAL_FADE_SPEED = 8; // pixels per frame for alpha change
+
     // Customer patience timer (starts when level first draws)
     // Per-level durations:
     // Level 1 -> 1.5 minutes (90,000 ms)
@@ -431,6 +448,88 @@ class Level {
       this._mixGradientCache[key] = g;
       return g;
     };
+
+    // Helper: check if a point is inside the vial bottle hitbox (not the image)
+    this._isPointInVialHitbox = (px, py, vial) => {
+      if (vial.isCrystal) return false; // crystal uses different hitbox
+
+      const vialW = vial.width * vial.scale * 0.75; // thinner overall
+      const vialH = vial.height * vial.scale + 1; // increased length by 3px
+      const adjustedVialY = vial.y + 6; // moved down by 6px
+
+      const rectHeight = vialH * 0.8 - 7; // rectangle body, 7px shorter
+      const neckHeight = vialH * 0.2 + 3; // thin rectangle top (neck), 3px larger
+      const neckWidth = vialW * 0.35; // neck is thin
+
+      // Check body rectangle
+      const bodyLeft = vial.x - vialW / 2;
+      const bodyRight = vial.x + vialW / 2;
+      const bodyTop = adjustedVialY - rectHeight / 2;
+      const bodyBottom = adjustedVialY + rectHeight / 2;
+
+      if (
+        px >= bodyLeft &&
+        px <= bodyRight &&
+        py >= bodyTop &&
+        py <= bodyBottom
+      ) {
+        return true;
+      }
+
+      // Check neck rectangle
+      const neckLeft = vial.x - neckWidth / 2;
+      const neckRight = vial.x + neckWidth / 2;
+      const neckTop = adjustedVialY - rectHeight / 2 - neckHeight;
+      const neckBottom = adjustedVialY - rectHeight / 2;
+
+      if (
+        px >= neckLeft &&
+        px <= neckRight &&
+        py >= neckTop &&
+        py <= neckBottom
+      ) {
+        return true;
+      }
+
+      return false;
+    };
+
+    // Helper: check if a point is inside the crystal diamond hitbox
+    this._isPointInCrystalHitbox = (px, py, vial) => {
+      if (!vial.isCrystal) return false; // only for crystals
+
+      const crystalW = vial.width * vial.scale;
+      const crystalH = vial.height * vial.scale;
+      const halfW = crystalW / 2;
+      const halfH = crystalH / 2;
+
+      const centerX = vial.x;
+      const centerY = vial.y;
+
+      // Diamond shape: top triangle + bottom triangle
+      // Check if point is in top triangle
+      const inTopTriangle =
+        px >= centerX - halfW &&
+        px <= centerX + halfW &&
+        py <= centerY &&
+        // Point-in-triangle test for top triangle
+        (px - centerX) * (centerY - py) +
+          Math.abs(px - centerX) * (py - (centerY - halfH)) <=
+          halfW * halfH;
+
+      // Check if point is in bottom triangle
+      const inBottomTriangle =
+        px >= centerX - halfW &&
+        px <= centerX + halfW &&
+        py >= centerY &&
+        // Point-in-triangle test for bottom triangle
+        (centerX - px) * (py - centerY) +
+          Math.abs(px - centerX) * (centerY + halfH - py) <=
+          halfW * halfH;
+
+      return inTopTriangle || inBottomTriangle;
+    };
+
     // --- SEQUENCE TRACKING ---
     this.addedIngredients = [];
     // Level 1: only 3 vials (id: lightgreen, midblue, lightred)
@@ -830,6 +929,25 @@ class Level {
       if (patienceFrac <= 0 && !this.crystalAdded && !this.levelResult) {
         this.levelResult = "TIMEOUT";
         if (typeof Results !== "undefined") Results.reset();
+      }
+
+      // Update background music playback rate based on remaining patience
+      // As time runs low, speed up the music incrementally
+      // Speed scaling varies by level:
+      // Levels 1 & 2: 1.0x (full) → 1.10x (half) → 1.3x (empty)
+      // Level 3: 1.0x (full) → 1.25x (half) → 1.5x (empty)
+      let maxPlaybackRate = 1.3; // default for levels 1 & 2
+      if (this.levelNumber === 3) {
+        maxPlaybackRate = 1.5;
+      }
+      const musicPlaybackRate = lerp(
+        maxPlaybackRate,
+        1.0,
+        constrain(patienceFrac, 0, 1),
+      );
+      const bgMusic = document.getElementById("bg-music");
+      if (bgMusic) {
+        bgMusic.playbackRate = musicPlaybackRate;
       }
     }
 
@@ -1825,6 +1943,17 @@ class Level {
               this.patienceElapsedAtPause =
                 millis() - (this.patienceStart || 0);
             }
+
+            // Play liquid pouring sound at 60% volume when pour begins
+            const pouringSound = document.getElementById(
+              "liquid-pouring-sound",
+            );
+            if (pouringSound) {
+              pouringSound.currentTime = 0; // reset to start
+              pouringSound.volume = 0.6; // 60% volume
+              pouringSound.loop = false; // play once
+              pouringSound.play().catch(() => {});
+            }
           }
         }
 
@@ -1840,8 +1969,12 @@ class Level {
         } = getScaleAndOffset();
         const adjustedMX_v = (mouseX - _ox) / _sf;
         const adjustedMY_v = (mouseY - _oy) / _sf;
-        const halfW_v = vial.width * 0.5 * vial.scale;
-        const halfH_v = vial.height * 0.5 * vial.scale;
+
+        // Use vial bottle hitbox detection instead of image dimensions
+        const isPointInHitbox = vial.isCrystal
+          ? this._isPointInCrystalHitbox(adjustedMX_v, adjustedMY_v, vial)
+          : this._isPointInVialHitbox(adjustedMX_v, adjustedMY_v, vial);
+
         const isHoverV =
           !vial.isHeld &&
           !vial.isMoving &&
@@ -1849,10 +1982,7 @@ class Level {
           !anyVialHeld && // suppress other vial hover while one is held
           !anyVialActive && // suppress hover while any vial is active (pouring)
           !spoonActive && // suppress vial hover while spoon is active
-          adjustedMX_v > vial.x - halfW_v &&
-          adjustedMX_v < vial.x + halfW_v &&
-          adjustedMY_v > vial.y - halfH_v &&
-          adjustedMY_v < vial.y + halfH_v;
+          isPointInHitbox;
         // Subtle lift on hover: smaller offset and gentler interpolation
         const targetLift = isHoverV ? -3 : 0; // negative Y moves up (reduced from -4)
         vial.lift = vial.lift === undefined ? 0 : vial.lift;
@@ -2002,6 +2132,18 @@ class Level {
                 vial.droppedFromHeld = false;
                 vial.lockedStreamEndX = null;
 
+                // Trigger fade-out of first vial guide when first vial completes pour on Level 1
+                if (
+                  this.levelNumber === 1 &&
+                  this.firstVialPickedUp &&
+                  !this.firstVialPoured &&
+                  !vial.isCrystal
+                ) {
+                  this.firstVialPoured = true;
+                  this.firstVialGuideFadeInProgress = false;
+                  this.firstVialGuideFadeOutProgress = true;
+                }
+
                 // Play glass cling sound when vial returns to shelf (at 40% volume)
                 const glassReturnSound =
                   document.getElementById("glass-cling-sound");
@@ -2036,6 +2178,18 @@ class Level {
                 vial.y = vial.startY;
                 // restore closed appearance after returning to shelf
                 vial.img = vial.closedImg;
+
+                // Trigger fade-out of first vial guide when first vial completes pour on Level 1
+                if (
+                  this.levelNumber === 1 &&
+                  this.firstVialPickedUp &&
+                  !this.firstVialPoured &&
+                  !vial.isCrystal
+                ) {
+                  this.firstVialPoured = true;
+                  this.firstVialGuideFadeInProgress = false;
+                  this.firstVialGuideFadeOutProgress = true;
+                }
 
                 // Play glass cling sound when vial returns to shelf (at 40% volume)
                 const glassReturnSound =
@@ -2387,6 +2541,259 @@ class Level {
       }
       pop();
     });
+
+    // ========== DEBUG: DRAW ALL HITBOXES WHEN LEVEL_DEBUG_HITBOX IS ENABLED ==========
+    if (LEVEL_DEBUG_HITBOX) {
+      push();
+      noFill();
+      strokeWeight(2);
+
+      // Draw vial hitboxes as bottle shape (rectangle + thin rectangle on top)
+      this.vials.forEach((vial) => {
+        if (!vial.isCrystal) {
+          // Regular vial: bottle shape (rectangle + thin rectangle on top)
+          stroke(100, 200, 255); // cyan
+
+          const vialW = vial.width * vial.scale * 0.75; // thinner overall
+          const vialH = vial.height * vial.scale + 1; // increased length by 3px
+          const adjustedVialY = vial.y + 6; // moved down by 6px
+
+          const rectHeight = vialH * 0.8 - 7; // rectangle body, 7px shorter
+          const neckHeight = vialH * 0.2 + 3; // neck, 3px larger
+          const halfW = vialW / 2;
+          const neckWidth = vialW * 0.35; // neck is even thinner
+
+          // Draw main rectangle body with rounded corners
+          rectMode(CENTER);
+          const rectY = adjustedVialY + neckHeight / 2; // offset for neck
+          rect(vial.x, rectY, vialW, rectHeight, 8); // 8 is corner radius
+
+          // Draw thin rectangle on top (bottle neck)
+          const neckY = adjustedVialY - rectHeight / 2 - neckHeight / 2;
+          rect(vial.x, neckY, neckWidth, neckHeight, 4); // 4 is corner radius for neck
+        }
+      });
+
+      // Draw crystal hitbox as diamond (two triangles)
+      const crystalVial = this.vials.find((v) => v.isCrystal);
+      if (crystalVial) {
+        stroke(255, 100, 200); // magenta
+
+        const crystalW = crystalVial.width * crystalVial.scale;
+        const crystalH = crystalVial.height * crystalVial.scale;
+        const halfW = crystalW / 2;
+        const halfH = crystalH / 2;
+
+        // Diamond shape: top triangle + bottom triangle (inverted)
+        // Top triangle
+        triangle(
+          crystalVial.x,
+          crystalVial.y - halfH, // top point
+          crystalVial.x - halfW,
+          crystalVial.y, // left
+          crystalVial.x + halfW,
+          crystalVial.y, // right
+        );
+
+        // Bottom triangle (upside down)
+        triangle(
+          crystalVial.x,
+          crystalVial.y + halfH, // bottom point
+          crystalVial.x - halfW,
+          crystalVial.y, // left
+          crystalVial.x + halfW,
+          crystalVial.y, // right
+        );
+      }
+
+      // Draw cauldron dropzone (ellipse)
+      if (this.dropZone) {
+        stroke(255, 200, 50); // orange
+        // Draw the main ellipse/semi-oval
+        ellipseMode(CENTER);
+        const rx =
+          this.dropZone.actualRx ||
+          this.dropZone.radiusX ||
+          this.dropZone.r ||
+          0;
+        const ry =
+          this.dropZone.actualRy ||
+          this.dropZone.radiusY ||
+          this.dropZone.r ||
+          0;
+        ellipse(this.dropZone.x, this.dropZone.y, rx * 2, ry * 2);
+
+        // Draw crystal zone if different
+        if (this.dropZone.crystalRx !== undefined) {
+          stroke(200, 50, 255); // purple
+          const cRx = this.dropZone.crystalRx;
+          const cRy = this.dropZone.crystalRy;
+          const cExtendUp = this.dropZone.crystalExtendUp || 0;
+          // Draw arc
+          ellipse(
+            this.dropZone.crystalCx,
+            this.dropZone.crystalCy,
+            cRx * 2,
+            cRy * 2,
+          );
+          // Draw rectangle extension upward
+          rectMode(CENTER);
+          rect(
+            this.dropZone.crystalCx,
+            this.dropZone.crystalCy - cExtendUp / 2,
+            cRx * 2,
+            cExtendUp,
+          );
+        }
+      }
+
+      // Draw spoon hitbox
+      if (this.spoonX !== undefined && this.spoonY !== undefined) {
+        stroke(50, 255, 100); // green
+        const detectX =
+          this.spoonIsHeld && this.spoonDisplayX
+            ? this.spoonDisplayX
+            : this.spoonX;
+        const detectY =
+          this.spoonY +
+          (this.spoonLift || 0) +
+          (typeof SPOON_HITBOX_Y_OFFSET !== "undefined"
+            ? SPOON_HITBOX_Y_OFFSET
+            : 0);
+
+        push();
+        translate(detectX, detectY);
+        rotate(this.spoonRotation || 0);
+        const drawW =
+          this.spoonWidth *
+          (this.spoonScale || 1) *
+          (typeof SPOON_HITBOX_WIDTH_SCALE !== "undefined"
+            ? SPOON_HITBOX_WIDTH_SCALE
+            : 1);
+        const drawH =
+          this.spoonHeight *
+          (this.spoonScale || 1) *
+          (typeof SPOON_HITBOX_HEIGHT_SCALE !== "undefined"
+            ? SPOON_HITBOX_HEIGHT_SCALE
+            : 1);
+        ellipseMode(CENTER);
+        ellipse(0, 0, drawW, drawH);
+        pop();
+      }
+
+      // Debug info display
+      noStroke();
+      fill(255, 255, 100);
+      textAlign(LEFT, TOP);
+      textSize(13);
+      const infoX = 12;
+      const infoY = BASE_HEIGHT - 140;
+      text(
+        `Level Hitboxes (H toggle):\nCyan = Vials (Norman Window)\nMagenta = Crystal (Diamond)\nOrange = Cauldron\nPurple = Crystal zone\nGreen = Spoon`,
+        infoX,
+        infoY,
+      );
+
+      pop();
+    }
+
+    // ========== ENVELOPE GUIDE OVERLAY (Level 1 only at start) ==========
+    // Display instructional text at game start, disappears when envelope is clicked
+    if (this.levelNumber === 1) {
+      // Trigger fade-in on first draw of Level 1
+      if (!this.envelopeGuideShown) {
+        this.envelopeGuideShown = true;
+        this.envelopeGuideFadeInProgress = true;
+      }
+
+      // Update alpha for fade animation
+      if (this.envelopeGuideFadeInProgress) {
+        this.envelopeGuideAlpha = Math.min(
+          255,
+          this.envelopeGuideAlpha + this.FIRST_VIAL_FADE_SPEED * 1.5,
+        );
+        if (this.envelopeGuideAlpha >= 240) {
+          this.envelopeGuideFadeInProgress = false;
+        }
+      } else if (this.envelopeGuideFadeOutProgress) {
+        this.envelopeGuideAlpha = Math.max(
+          0,
+          this.envelopeGuideAlpha - this.FIRST_VIAL_FADE_SPEED,
+        );
+      }
+
+      // Render guide text at top center with fade animation
+      if (this.envelopeGuideAlpha > 0) {
+        push();
+
+        // Position: top center of screen
+        const textX = BASE_WIDTH / 2;
+        const textY = 80;
+
+        // Draw very opaque yellow glow background
+        fill(206, 181, 58, this.envelopeGuideAlpha * 0.95); // very opaque yellow glow
+        rectMode(CENTER);
+        rect(textX, textY, 450, 50, 10);
+
+        // Draw text with dark brown color
+        textAlign(CENTER, CENTER);
+        textFont(FONT_IM_FELL_ENGLISH);
+        textStyle(ITALIC);
+        textSize(20);
+        fill(45, 9, 0, this.envelopeGuideAlpha); // dark brown #2D0900 with alpha
+        text("Unseal the letter to learn what's inside.", textX, textY);
+
+        pop();
+      }
+    }
+
+    // ========== FIRST VIAL GUIDE OVERLAY (Level 1 only, after envelope clicked) ==========
+    // Display instructional text when player picks up first vial
+    if (
+      this.levelNumber === 1 &&
+      this.envelopeClicked &&
+      this.firstVialPickedUp
+    ) {
+      // Update alpha for fade animation
+      if (this.firstVialGuideFadeInProgress) {
+        this.firstVialGuideAlpha = Math.min(
+          255,
+          this.firstVialGuideAlpha + this.FIRST_VIAL_FADE_SPEED * 1.5,
+        );
+        if (this.firstVialGuideAlpha >= 240) {
+          this.firstVialGuideFadeInProgress = false;
+        }
+      } else if (this.firstVialGuideFadeOutProgress) {
+        this.firstVialGuideAlpha = Math.max(
+          0,
+          this.firstVialGuideAlpha - this.FIRST_VIAL_FADE_SPEED,
+        );
+      }
+
+      // Render guide text at bottom center with fade animation
+      if (this.firstVialGuideAlpha > 0) {
+        push();
+
+        // Position: bottom center of screen
+        const textX = BASE_WIDTH / 2;
+        const textY = BASE_HEIGHT - 65;
+
+        // Draw very opaque yellow glow background
+        fill(206, 181, 58, this.firstVialGuideAlpha * 0.95); // very opaque yellow glow
+        rectMode(CENTER);
+        rect(textX, textY, 450, 50, 10);
+
+        // Draw text with dark brown color
+        textAlign(CENTER, CENTER);
+        textFont(FONT_IM_FELL_ENGLISH);
+        textStyle(ITALIC);
+        textSize(20);
+        fill(45, 9, 0, this.firstVialGuideAlpha); // dark brown #2D0900 with alpha
+        text("Drag vial to the cauldron's glow.", textX, textY);
+
+        pop();
+      }
+    }
 
     // (Held vial is drawn later so it can appear above UI elements)
 
@@ -2799,13 +3206,12 @@ class Level {
 
   selectBottle(mx, my) {
     this.vials.forEach((vial) => {
-      if (
-        !vial.used &&
-        mx > vial.x - vial.width / 2 &&
-        mx < vial.x + vial.width / 2 &&
-        my > vial.y - vial.height / 2 &&
-        my < vial.y + vial.height / 2
-      ) {
+      // Use appropriate hitbox detection based on vial type
+      const isPointInHitbox = vial.isCrystal
+        ? this._isPointInCrystalHitbox(mx, my, vial)
+        : this._isPointInVialHitbox(mx, my, vial);
+
+      if (!vial.used && isPointInHitbox) {
         this.selectedBottle = vial;
         vial.isSelected = true;
       } else {
@@ -2825,6 +3231,15 @@ class Level {
     if (this.selectedBottle.isCrystal) {
       this.patiencePaused = true;
       this.patienceElapsedAtPause = millis() - (this.patienceStart || 0);
+    }
+
+    // Play liquid pouring sound at 60% volume when pour begins
+    const pouringSound = document.getElementById("liquid-pouring-sound");
+    if (pouringSound) {
+      pouringSound.currentTime = 0; // reset to start
+      pouringSound.volume = 0.6; // 60% volume
+      pouringSound.loop = false; // play once
+      pouringSound.play().catch(() => {});
     }
   }
 
@@ -3749,19 +4164,28 @@ function levelMousePressed() {
 
   // No bottle held — try to pick one up by clicking on it
   levelInstance.vials.forEach((vial) => {
-    if (
-      !vial.used &&
-      !vial.isMoving &&
-      adjustedX > vial.x - vial.width / 2 &&
-      adjustedX < vial.x + vial.width / 2 &&
-      adjustedY > vial.y - vial.height / 2 &&
-      adjustedY < vial.y + vial.height / 2
-    ) {
+    // Use appropriate hitbox detection based on vial type
+    const isPointInHitbox = vial.isCrystal
+      ? levelInstance._isPointInCrystalHitbox(adjustedX, adjustedY, vial)
+      : levelInstance._isPointInVialHitbox(adjustedX, adjustedY, vial);
+
+    if (!vial.used && !vial.isMoving && isPointInHitbox) {
       vial.isSelected = true;
       vial.isHeld = true;
       // swap to open asset and slightly enlarge while held
       vial.img = vial.openImg || vial.closedImg;
       vial.targetScale = vial.isCrystal ? 1.18 : 1.08;
+
+      // Trigger first vial guide on Level 1 (only on first pickup, after envelope clicked)
+      if (
+        levelInstance.levelNumber === 1 &&
+        !levelInstance.firstVialPickedUp &&
+        !vial.isCrystal &&
+        levelInstance.envelopeClicked
+      ) {
+        levelInstance.firstVialPickedUp = true;
+        levelInstance.firstVialGuideFadeInProgress = true;
+      }
 
       // Play glass cling sound for all vials
       const glassSound = document.getElementById("glass-cling-sound");
@@ -3804,6 +4228,23 @@ function levelMousePressed() {
       adjustedY < env.y + envHeight / 2
     ) {
       levelInstance.isOrderOpen = true;
+
+      // Play paper sound when envelope is clicked
+      const paperSound = document.getElementById("paper-sound");
+      if (paperSound) {
+        paperSound.currentTime = 0; // reset to start
+        paperSound.volume = 1.0; // full volume
+        paperSound.loop = false; // play once
+        paperSound.play().catch(() => {});
+      }
+
+      // On Level 1, trigger fade-out of envelope guide and enable vial guide on first envelope click
+      if (levelInstance.levelNumber === 1 && !levelInstance.envelopeClicked) {
+        levelInstance.envelopeClicked = true;
+        levelInstance.envelopeGuideFadeInProgress = false;
+        levelInstance.envelopeGuideFadeOutProgress = true;
+      }
+
       return;
     }
   }
@@ -3903,6 +4344,14 @@ function levelMousePressed() {
     }
 
     levelInstance.isRecipeOpen = true;
+    // Play paper sound when recipe is opened
+    const paperSound = document.getElementById("paper-sound");
+    if (paperSound) {
+      paperSound.currentTime = 0; // reset to start
+      paperSound.volume = 1.0; // full volume
+      paperSound.loop = false; // play once
+      paperSound.play().catch(() => {});
+    }
     // If the player previously unlocked the flashlight (pressed "Very well."),
     // enable it automatically when opening the recipe on Level 3.
     if (levelInstance.levelNumber === 3 && levelInstance.flashlightUnlocked) {
