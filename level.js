@@ -330,6 +330,7 @@ class Level {
     this.hasUnreadOrder = true;
     this.envelopeScale = 1;
     this.orderStarted = false;
+    this.sequenceInvalid = false;
 
     // Customer patience timer (starts when level first draws)
     this.patienceDuration = 120000; // 2 minutes in ms
@@ -390,20 +391,24 @@ class Level {
     // Level 3+: lightgreen, midblue, black, lightpurple, lightred
     if (this.levelNumber === 1) {
       this.correctOrder = [
-        assets.bottleLightgreen,
-        assets.bottleMidblue,
-        assets.bottleLightred,
+        assets.bottleDarkgreen,
+        assets.bottleClosedOrange,
+        assets.bottleTeal,
       ];
       this.sequences = null; // Level 1 uses single sequence (correctOrder)
       this.currentSequenceIndex = 0;
       this.completedSequences = [];
     } else if (this.levelNumber === 2) {
+      // Level 2: explicit ordered steps including a mixing step which
+      // must be completed (mixMeterComplete) at the right time.
+      // Use the sentinel string 'MIX' to represent the required mix step.
       this.correctOrder = [
-        assets.bottleLightgreen,
-        assets.bottleMidblue,
         assets.bottleBlack,
-        assets.bottleLightpurple,
         assets.bottleLightred,
+        assets.bottleMidblue,
+        assets.bottleLightpurple,
+        "MIX",
+        assets.bottleLightgreen,
       ];
       this.sequences = null;
       this.currentSequenceIndex = 0;
@@ -452,6 +457,7 @@ class Level {
     this.mixAccumMs = 0; // accumulated mixing time in milliseconds
     this.MIX_REQUIRED_MS = 2000; // ms required to complete mix (configurable)
     this.mixSuccessShowFrame = null; // frameCount when success message should appear and then disappear
+    this.mixStartedWhenAtMixStep = false; // tracks if player began mixing at required mix step (Level 2)
     // Stirring sound tracking
     this.stirringSound = null; // reference to HTML audio element
     this.isActivelyStirring = false; // true when player is actually moving spoon left/right
@@ -570,11 +576,21 @@ class Level {
     }
 
     // Single sequence (Level 1 and Level 3+)
-    const isCorrect =
+    // Custom comparison: the 'MIX' slot requires a full MIX only.
+    let isCorrect =
       this.addedIngredients.length === this.correctOrder.length &&
-      this.correctOrder.every(
-        (bottleImg, index) => this.addedIngredients[index] === bottleImg,
-      );
+      this.correctOrder.every((bottleImg, index) => {
+        const added = this.addedIngredients[index];
+        if (bottleImg === "MIX") {
+          return added === "MIX";
+        }
+        return added === bottleImg;
+      });
+
+    // If mixing was performed incorrectly (out-of-order or partial at required
+    // step), the sequence is considered invalid — defer final display until
+    // the crystal is added but ensure the check fails.
+    if (this.sequenceInvalid) isCorrect = false;
 
     // Only set a result when the crystal has been added; the final result
     // (CORRECT / WRONG) should occur after the player completes the sequence
@@ -1249,6 +1265,33 @@ class Level {
               this.mixMeterComplete = true;
               if (this.mixSuccessShowFrame === null)
                 this.mixSuccessShowFrame = frameCount;
+              // If this is Level 2, mixing must occur as the specific step.
+              if (this.levelNumber === 2) {
+                // Expected index for the MIX sentinel (0-based)
+                const expectedMixIndex = 4; // after 4 vials
+                // If player has not added exactly the 4 preceding vials,
+                // mixing now is invalid -> mark sequence invalid (defer final
+                // result until crystal is added so overlay doesn't show yet).
+                if ((this.addedIngredients || []).length !== expectedMixIndex) {
+                  this.sequenceInvalid = true;
+                  console.log(
+                    "Mixing occurred out of order — sequence marked invalid",
+                  );
+                } else {
+                  // Record the mix step so sequence comparisons succeed later.
+                  // If a PARTIAL_MIX was previously recorded, upgrade it to a full MIX.
+                  const PARTIAL_INDEX = (this.addedIngredients || []).indexOf(
+                    "PARTIAL_MIX",
+                  );
+                  if (PARTIAL_INDEX !== -1) {
+                    this.addedIngredients[PARTIAL_INDEX] = "MIX";
+                    console.log("Upgraded PARTIAL_MIX to MIX");
+                  } else if (!this.addedIngredients.includes("MIX")) {
+                    this.addedIngredients.push("MIX");
+                    console.log("Mix step recorded");
+                  }
+                }
+              }
             }
           }
         }
@@ -1625,11 +1668,12 @@ class Level {
               : 0.008
             : 0.02;
 
-          // For return to shelf phase, move vials back faster (double speed)
+          // For return to shelf phase, do not aggressively speed up — keep
+          // a slightly slower, more natural return timing.
           const isRegularBottleReturning =
-            !vial.isCrystal && vial.progress >= 1.5 && vial.progress < 2.5;
+            !vial.isCrystal && vial.progress >= 1.5 && vial.progress < 3.0;
           if (isRegularBottleReturning) {
-            speed *= 2; // double speed for return to shelf
+            speed *= 1.0; // no forced doubling; progress-driven timing used instead
           }
 
           vial.progress += speed;
@@ -1722,10 +1766,13 @@ class Level {
                 vial.startX,
                 vial.startY,
               );
+              // Make returns feel consistent: enforce a larger minimum and
+              // slightly increase the distance multiplier so mid-placed pours
+              // don't snap back too fast.
               const returnDuration = max(
-                0.2,
-                (returnDistance / max(referenceReturnDistance, 1)) * 0.5,
-              ); // multiply by 0.5 to make return faster
+                0.6,
+                (returnDistance / max(referenceReturnDistance, 1)) * 1.2,
+              );
 
               if (vial.progress < 1.5) {
                 // Pouring phase (tilting happens during this)
@@ -1779,7 +1826,7 @@ class Level {
                   this.addedIngredients.push(vial.closedImg);
                   console.log("Added ingredient:", vial.closedImg);
                 }
-              } else if (vial.progress < 2.5) {
+              } else if (vial.progress < 3.0) {
                 const back = vial.progress - 1.5;
                 vial.x = lerp(targetX, vial.startX, back);
                 vial.y = lerp(targetY, vial.startY, back);
@@ -1926,12 +1973,16 @@ class Level {
             lightred: color("#BE272C"),
             midblue: color("#5388C5"),
             lightorange: color("#FD9D07"),
+            // allow plain 'orange' id to map to the same colour
+            orange: color("#FD9D07"),
             teal: color("#1F8087"),
             yellow: color("#EFD000"),
           };
 
-          // Use id-based mapping only
-          const baseColour = colourMap[vial.id] || color(150, 150, 150);
+          // Normalize vial id by stripping trailing digits (level suffixes like '2')
+          const idBase = (vial.id || "").toString().replace(/\d+$/, "");
+          // Use id-based mapping (fall back to grey if unknown)
+          const baseColour = colourMap[idBase] || color(150, 150, 150);
           // Ensure fully opaque stream colour (alpha = 255)
           const streamColour = color(
             red(baseColour),
@@ -2734,7 +2785,7 @@ class Level {
       displayLevelForRecipe === 1
         ? "Brewed under a waning moon, said to tip f ate's scales in the " +
           "drinker\u2019s  favour before a wager\u2026or a duel."
-        : "When stars align and ingredients ignite, magic takes flight.";
+        : "When stars align and ingredients ignite, magic stirs the heart and sets passion alight.";
 
     // Manual word-wrap
     const _words = _desc.split(" ");
@@ -2812,19 +2863,19 @@ class Level {
         {
           x: CX + Math.cos((5 * Math.PI) / 6) * triangleRadius,
           y: CY + Math.sin((5 * Math.PI) / 6) * triangleRadius,
-          img: this.assets.symbolLightgreen,
+          img: this.assets.symbolDarkgreen,
           label: "Begin here.",
         },
         {
           x: CX + Math.cos(Math.PI / 6) * triangleRadius,
           y: CY + Math.sin(Math.PI / 6) * triangleRadius,
-          img: this.assets.symbolMidblue,
+          img: this.assets.symbolOrange,
           label: "Follows the first.",
         },
         {
           x: CX,
           y: CY - triangleRadius,
-          img: this.assets.symbolRed,
+          img: this.assets.symbolTeal,
           label: "Last vial.",
         },
       ];
@@ -2835,25 +2886,25 @@ class Level {
           x: 810 + SHIFT_X,
           y: 273,
           img: this.assets.symbolRed,
-          label: "Last vial.",
+          label: "The second.",
         },
         {
           x: 777 + SHIFT_X,
           y: 368,
           img: this.assets.symbolLightgreen,
-          label: "Begin here.",
+          label: "Mix, then end.",
         },
         {
           x: 674 + SHIFT_X,
           y: 368,
           img: this.assets.symbolMidblue,
-          label: "Follows the first.",
+          label: "After the second.",
         },
         {
           x: 644 + SHIFT_X,
           y: 273,
           img: this.assets.symbolBlack,
-          label: "The anchor.",
+          label: "The root.",
         },
         {
           x: 726 + SHIFT_X,
@@ -2944,6 +2995,10 @@ class Level {
           // Increase horizontal spacing between lower-left and lower-right labels
           if (v.label === "Begin here.") lx += 12;
           else if (v.label === "Follows the first.") lx -= 12;
+          // Fine-tune newer Level 2 labels: push 'Mix, then end.' right
+          // and 'After the second.' left for better alignment.
+          else if (v.label === "Mix, then end.") lx += 16;
+          else if (v.label === "After the second.") lx -= 16;
           // Use centered alignment; choose vertical anchor per position
           if (v.label === "Nearly there.") {
             g.textAlign(CENTER, BOTTOM);
@@ -3057,6 +3112,14 @@ function levelMousePressed() {
       levelInstance.orderStarted = true;
       levelInstance.hasUnreadOrder = false;
       levelInstance.isOrderOpen = false;
+      // Reset mix / sequence state for a fresh attempt
+      levelInstance.sequenceInvalid = false;
+      levelInstance.addedIngredients = [];
+      levelInstance.crystalAdded = false;
+      levelInstance.mixAccumMs = 0;
+      levelInstance.mixMeterComplete = false;
+      levelInstance.mixSuccessShowFrame = null;
+      levelInstance.mixStartedWhenAtMixStep = false;
       return;
     }
 
@@ -3108,12 +3171,30 @@ function levelMousePressed() {
       levelInstance.stirringSound.pause();
       levelInstance.stirringSound.currentTime = 0;
     }
+    // If player started mixing at the correct step but didn't finish,
+    // mark the sequence invalid (partial mixes are not allowed).
+    if (
+      levelInstance.levelNumber === 2 &&
+      levelInstance.mixStartedWhenAtMixStep &&
+      !levelInstance.mixMeterComplete
+    ) {
+      const expectedMixIndex = 4;
+      if ((levelInstance.addedIngredients || []).length === expectedMixIndex) {
+        levelInstance.sequenceInvalid = true;
+        console.log(
+          "Partial mix (unfinished) at required step — sequence marked invalid",
+        );
+      }
+    }
+
     // Reset targets so spoon smoothly returns
     levelInstance.targetSpoonScale = 1.0;
     levelInstance.targetSpoonRotation = levelInstance.spoonBaseRotation;
     levelInstance.targetSpoonDisplayX = levelInstance.spoonBaseX;
     levelInstance.spoonMouseStartX = 0;
     levelInstance.spoonMouseStartY = 0;
+    // Clear the mix-start flag
+    levelInstance.mixStartedWhenAtMixStep = false;
     return;
   }
 
@@ -3166,10 +3247,28 @@ function levelMousePressed() {
           (ly * ly) / (bUnscaled * bUnscaled) <=
           1;
       if (insideEllipseMath) {
-        levelInstance.spoonIsHeld = true;
-        levelInstance.spoonMouseStartX = 0;
-        levelInstance.spoonMouseStartY = 0;
-        return;
+        // Prevent picking up the spoon while any vial/crystal is being
+        // interacted with (held or in motion).
+        const anyVialInteracting = levelInstance.vials.some(
+          (v) => v.isHeld || v.isMoving,
+        );
+        if (!anyVialInteracting) {
+          levelInstance.spoonIsHeld = true;
+          levelInstance.spoonMouseStartX = 0;
+          levelInstance.spoonMouseStartY = 0;
+          // Record if player starts holding spoon at Level 2 when the
+          // sequence has reached the fourth added ingredient (mix step)
+          // so we can allow a partial mix as a valid non-mix.
+          if (
+            levelInstance.levelNumber === 2 &&
+            (levelInstance.addedIngredients || []).length === 4
+          ) {
+            levelInstance.mixStartedWhenAtMixStep = true;
+          }
+          return;
+        }
+        // Otherwise, ignore the spoon pickup so click can fall through
+        // to vial interactions below.
       }
     } catch (e) {
       // If Path2D/ellipse not supported, fall back to math test
@@ -3195,10 +3294,24 @@ function levelMousePressed() {
         bScaled > 0 &&
         (lx * lx) / (aScaled * aScaled) + (ly * ly) / (bScaled * bScaled) <= 1;
       if (insideEllipse) {
-        levelInstance.spoonIsHeld = true;
-        levelInstance.spoonMouseStartX = 0;
-        levelInstance.spoonMouseStartY = 0;
-        return;
+        // Prevent picking up the spoon while any vial/crystal is being
+        // interacted with (held or in motion). If a vial is interacting,
+        // allow the click to continue to vial handlers below.
+        const anyVialInteracting = levelInstance.vials.some(
+          (v) => v.isHeld || v.isMoving,
+        );
+        if (!anyVialInteracting) {
+          levelInstance.spoonIsHeld = true;
+          levelInstance.spoonMouseStartX = 0;
+          levelInstance.spoonMouseStartY = 0;
+          if (
+            levelInstance.levelNumber === 2 &&
+            (levelInstance.addedIngredients || []).length === 4
+          ) {
+            levelInstance.mixStartedWhenAtMixStep = true;
+          }
+          return;
+        }
       }
     }
   }
@@ -3341,4 +3454,11 @@ function levelMouseWheel(e) {
 function levelKeyPressed() {
   // Escape is handled globally in main.js
   if (!levelInstance) return;
+  // Debug shortcut: press '3' to jump to Level 3
+  if (typeof key !== 'undefined' && key === '3') {
+    currentLevelNumber = 3;
+    createLevelInstance();
+    currentScreen = 'level';
+    return;
+  }
 }

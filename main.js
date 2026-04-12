@@ -113,7 +113,7 @@ function preload() {
   bottleOpenLightpink2 = loadImage("assets/vials/open-lightpink2.svg");
 
   crystalImg = loadImage("assets/crystal/crystal-v2.svg");
-  // Use single brown bowl asset instead of split top/bottom pieces
+  // Use single brown bowl asset
   bowlImg = loadImage("assets/crystal/brown-bowl.png");
   envelopeImg = loadImage("assets/order/envelope.png");
 
@@ -128,6 +128,11 @@ function preload() {
   symbolLightpink2 = loadImage("assets/symbols/symbol-lightpink2.svg");
   symbolOrange2 = loadImage("assets/symbols/symbol-orange2.svg");
   symbolYellow2 = loadImage("assets/symbols/symbol-yellow2.svg");
+
+  // Additional symbol variants (used by recipes)
+  symbolDarkgreen = loadImage("assets/symbols/symbol-darkgreen.svg");
+  symbolOrange = loadImage("assets/symbols/symbol-orange.svg");
+  symbolTeal = loadImage("assets/symbols/symbol-teal.svg");
 
   // Map screen icons
   mapIconsDefault = loadImage("assets/background/map-icons-default.png");
@@ -227,6 +232,10 @@ function createLevelInstance() {
   levelInstance.assets.symbolLightpink2 = symbolLightpink2;
   levelInstance.assets.symbolOrange2 = symbolOrange2;
   levelInstance.assets.symbolYellow2 = symbolYellow2;
+  // Attach new symbol assets
+  levelInstance.assets.symbolDarkgreen = symbolDarkgreen;
+  levelInstance.assets.symbolOrange = symbolOrange;
+  levelInstance.assets.symbolTeal = symbolTeal;
 }
 
 function jumpToLevel(levelNumber) {

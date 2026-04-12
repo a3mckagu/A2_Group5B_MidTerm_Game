@@ -72,6 +72,15 @@ const Results = {
       quoteText =
         "Remarkable! I can already feel the odds\nshifting in my favour. You have a gift.";
       attrText = "\u2014 Lord Alistair, unusually pleased";
+      // Level-specific overrides
+      if (
+        typeof levelInstance !== "undefined" &&
+        levelInstance.levelNumber === 2
+      ) {
+        quoteText =
+          "At last! Prince Dorian won't know what hit him...\nI must clear my schedule, I have bridal fittings to arrange!";
+        attrText = "\u2014 Lady Beaumont, beaming with joy (and delusion)";
+      }
       btnLabel = "PLAY AGAIN";
     } else if (type === "WRONG") {
       faceHi = color(68, 0, 0); // #440000
@@ -90,6 +99,14 @@ const Results = {
       quoteText =
         "This smells nothing like Beginner's Luck!\nI asked for fortune, not a biohazard.";
       attrText = "\u2014 Lord Alistair, deeply unimpressed";
+      if (
+        typeof levelInstance !== "undefined" &&
+        levelInstance.levelNumber === 2
+      ) {
+        quoteText =
+          "This is NOT Sparks Fly! How am I supposed to win\nPrince Dorian's heart with this sludge?!";
+        attrText = "\u2014 Lady Beaumont, beside herself";
+      }
       btnLabel = "TRY AGAIN";
     } else {
       // TIMEOUT
@@ -109,6 +126,14 @@ const Results = {
       quoteText =
         "I am a lord, not a patient man.\nMy luck won't wait forever and neither shall I.";
       attrText = "\u2014 Lord Alistair, already halfway out the door";
+      if (
+        typeof levelInstance !== "undefined" &&
+        levelInstance.levelNumber === 2
+      ) {
+        quoteText =
+          "Every second without this potion is a second\nPrince Dorian slips further from my grasp!";
+        attrText = "\u2014 Lady Beaumont, spiralling";
+      }
       btnLabel = "TRY AGAIN";
     }
 
@@ -566,6 +591,13 @@ const Results = {
         levelInstance.assets.symbolLightpink2 = symbolLightpink2;
         levelInstance.assets.symbolOrange2 = symbolOrange2;
         levelInstance.assets.symbolYellow2 = symbolYellow2;
+        // Attach newer symbol variants added in main.js
+        if (typeof symbolDarkgreen !== "undefined")
+          levelInstance.assets.symbolDarkgreen = symbolDarkgreen;
+        if (typeof symbolOrange !== "undefined")
+          levelInstance.assets.symbolOrange = symbolOrange;
+        if (typeof symbolTeal !== "undefined")
+          levelInstance.assets.symbolTeal = symbolTeal;
       }
       return;
     }
