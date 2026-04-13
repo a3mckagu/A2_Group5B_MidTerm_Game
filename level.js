@@ -533,7 +533,7 @@ class Level {
     // --- SEQUENCE TRACKING ---
     this.addedIngredients = [];
     // Level 1: only 3 vials (id: lightgreen, midblue, lightred)
-    // Level 2: single Sparks Fly recipe using the 5-symbol sequence
+    // Level 2: single Sparks Flying recipe using the 5-symbol sequence
     // Level 3+: lightgreen, midblue, black, lightpurple, lightred
     if (this.levelNumber === 1) {
       this.correctOrder = [
@@ -1126,7 +1126,7 @@ class Level {
       let wallOrderTitle;
       let wallOrderSender;
       if (this.levelNumber === 2) {
-        wallOrderTitle = "Sparks Fly";
+        wallOrderTitle = "Sparks Flying";
         wallOrderSender = "From: Lady Beaumont";
       } else if (this.levelNumber === 3) {
         wallOrderTitle = "Last Light";
@@ -2999,7 +2999,7 @@ class Level {
         textSize(36);
         fill("#2D0900");
         let orderTitle;
-        if (this.levelNumber === 2) orderTitle = "Sparks Fly";
+        if (this.levelNumber === 2) orderTitle = "Sparks Flying";
         else if (this.levelNumber === 3) orderTitle = "Last Light";
         else orderTitle = "Beginner's Luck";
         text(orderTitle, cardLeft + 20, cardTop + 20 - this.orderScrollOffset);
@@ -3430,10 +3430,9 @@ class Level {
     textSize(30);
     textAlign(CENTER, TOP);
     fill(55, 30, 10);
-    const displayLevelForRecipe = this.levelNumber === 2 ? 3 : this.levelNumber;
     let potionTitle;
-    if (displayLevelForRecipe === 1) potionTitle = "Beginner's Luck";
-    else if (displayLevelForRecipe === 2) potionTitle = "Sparks Fly";
+    if (this.levelNumber === 1) potionTitle = "Beginner's Luck";
+    else if (this.levelNumber === 2) potionTitle = "Sparks Flying";
     else potionTitle = "Last Light";
     text(potionTitle, leftPageCX, bookTop + 66);
 
@@ -3450,9 +3449,9 @@ class Level {
     fill(55, 30, 10, 210);
 
     const _desc =
-      displayLevelForRecipe === 1
-        ? "Brewed under a waning moon, said to tip fate's scales in the drinker\u2019s favour before a wager or a duel."
-        : displayLevelForRecipe === 2
+      this.levelNumber === 1
+        ? "Brewed at the height of noon, said to tip fate's scales in the drinker\u2019s favour before a wager or a duel."
+        : this.levelNumber === 2
           ? "When stars align and ingredients ignite, magic stirs the heart and sets passion alight."
           : "When all else fails and hope wears thin, this remedy is said to restore life at death's edge.";
 

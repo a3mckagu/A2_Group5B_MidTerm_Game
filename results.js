@@ -164,7 +164,7 @@ const Results = {
         levelInstance.levelNumber === 2
       ) {
         quoteText =
-          "This is NOT Sparks Fly! How am I supposed to win\nPrince Dorian's heart with this sludge?!";
+          "This is NOT Sparks Flying! How am I supposed to win\nPrince Dorian's heart with this sludge?!";
         attrText = "\u2014 Lady Beaumont, beside herself";
       }
       // Level 3 override
