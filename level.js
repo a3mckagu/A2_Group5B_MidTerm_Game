@@ -616,6 +616,11 @@ class Level {
     this.lastStirMovementFrame = 0; // frameCount of last detected left/right movement
     this.stirringMotionThreshold = 10; // minimum pixels of movement to count as "active stirring"
     this.holdNoMovementStartFrame = null; // frameCount when player started holding without moving
+
+    // Level 2 new-item overlay
+    this.showNewItemOverlay = this.levelNumber === 2; // only show overlay on level 2
+    this.newItemOverlayStartTime = null; // ms timestamp when overlay started
+    this.newItemOverlayDuration = 2000; // 5 seconds in milliseconds
   }
 
   _shuffleArray(arr) {
@@ -753,6 +758,29 @@ class Level {
   }
 
   draw(paused = false) {
+    // Level 2 new-item overlay: display for 5 seconds at the start
+    if (this.showNewItemOverlay && this.levelNumber === 2) {
+      // Initialize overlay start time on first draw
+      if (this.newItemOverlayStartTime === null) {
+        this.newItemOverlayStartTime = millis();
+      }
+
+      // Calculate elapsed time since overlay started
+      const elapsedTime = millis() - this.newItemOverlayStartTime;
+
+      // If overlay time hasn't elapsed yet, show the overlay and return early
+      if (elapsedTime < this.newItemOverlayDuration) {
+        imageMode(CORNER);
+        if (this.assets && this.assets.newItemImg) {
+          image(this.assets.newItemImg, 0, 0, BASE_WIDTH, BASE_HEIGHT);
+        }
+        return;
+      } else {
+        // Overlay time complete, stop showing it
+        this.showNewItemOverlay = false;
+      }
+    }
+
     // Background: if the recipe book is open and a recipe background is available,
     // show the recipe-book background; otherwise use the normal level background.
     imageMode(CORNER);

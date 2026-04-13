@@ -36,7 +36,8 @@ let levelBg1,
   recipeBookClosed,
   recipeBookOpen,
   recipeBookBg,
-  spoonImg;
+  spoonImg,
+  newItemImg;
 let symbolBlack, symbolLightgreen, symbolLightpurple, symbolMidblue, symbolRed;
 let symbolLightpink2, symbolOrange2, symbolYellow2;
 let bottleGreen, bottleRed, bottleBlue, bottleOrange, bottlePink;
@@ -69,6 +70,7 @@ function preload() {
   levelBg2 = loadImage("assets/background/level-2.png");
   levelBg3 = loadImage("assets/background/level-3.png");
   recipeBookBg = loadImage("assets/background/recipe-book.png");
+  newItemImg = loadImage("assets/background/new-item.png");
   orderSheet = loadImage("assets/order/blank-order-sheet-2.png");
   blankOrderSheet2 = loadImage("assets/order/blank-order-sheet-2.png");
   cauldronImg = loadImage("assets/cauldron/cauldron-default-state.png");
@@ -192,6 +194,7 @@ function createLevelInstance() {
     recipeBookClosed,
     recipeBookOpen,
     levelBg: selectedLevelBg,
+    newItemImg,
     orderSheet,
     blankOrderSheet2,
     bottleBlack,
